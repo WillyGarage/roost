@@ -1,0 +1,208 @@
+# Automated smoke test: launches the published exe, drives every hotkey, and prints the
+# log, so the whole path can be verified without anyone watching the screen.
+#
+# Default run only OPENS and dismisses palettes; nothing is moved or created.
+# Pass -Commit to also perform a real move: it sends a scratch Character Map window to
+# a named desktop, follows it, then switches back. Still creates nothing permanent.
+
+param(
+    [switch]$Commit,
+
+    # Desktop to move the scratch window to during -Commit. Matched by the same fuzzy
+    # search the palette uses, so a prefix is enough.
+    [string]$MoveTo = 'GLP',
+
+    # Desktop to return to afterwards.
+    [string]$ReturnTo = 'Comm',
+
+    # Also exercise the create-name-position-move path, then delete the desktop it made.
+    [switch]$TestCreate
+)
+
+$ErrorActionPreference = 'Stop'
+
+$root = Split-Path -Parent $PSScriptRoot
+$exe  = Join-Path $root 'dist\Vdx.exe'
+$log  = Join-Path $env:LOCALAPPDATA "Vdx\logs\vdx-$(Get-Date -Format yyyyMMdd).log"
+
+if (-not (Test-Path $exe)) { throw "$exe not found. Run scripts\publish.ps1 first." }
+
+Add-Type -Name Keys -Namespace Smoke -MemberDefinition @'
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    public static extern void keybd_event(byte vk, byte scan, uint flags, System.UIntPtr extra);
+'@
+
+$WIN = 0x5B; $CTRL = 0x11; $ESC = 0x1B; $RET = 0x0D
+$UP  = 2
+
+function Send-Key([byte]$vk) {
+    [Smoke.Keys]::keybd_event($vk, 0, 0,   [UIntPtr]::Zero)
+    [Smoke.Keys]::keybd_event($vk, 0, $UP, [UIntPtr]::Zero)
+    Start-Sleep -Milliseconds 35
+}
+
+function Send-WinCtrl([byte]$key) {
+    [Smoke.Keys]::keybd_event($WIN,  0, 0,   [UIntPtr]::Zero)
+    [Smoke.Keys]::keybd_event($CTRL, 0, 0,   [UIntPtr]::Zero)
+    [Smoke.Keys]::keybd_event($key,  0, 0,   [UIntPtr]::Zero)
+    [Smoke.Keys]::keybd_event($key,  0, $UP, [UIntPtr]::Zero)
+    [Smoke.Keys]::keybd_event($CTRL, 0, $UP, [UIntPtr]::Zero)
+    [Smoke.Keys]::keybd_event($WIN,  0, $UP, [UIntPtr]::Zero)
+}
+
+function Send-Text([string]$text) {
+    foreach ($c in $text.ToCharArray()) {
+        if ($c -eq ' ')             { Send-Key 0x20 }
+        elseif ($c -match '[A-Za-z0-9]') { Send-Key ([byte][char]([string]$c).ToUpper()) }
+        # Anything else is skipped: this helper only needs to drive the search box.
+    }
+}
+
+# Desktop list read the same way the app reads it: the ordered GUID blob, with names
+# joined from the per-desktop subkeys. Never enumerate the subkeys for the list itself,
+# because deleted desktops leave their name entries behind.
+$vdRoot = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VirtualDesktops'
+
+function Get-DesktopGuids {
+    $blob = (Get-ItemProperty $vdRoot -Name VirtualDesktopIDs).VirtualDesktopIDs
+    0..([int]($blob.Length / 16) - 1) | ForEach-Object {
+        [guid]::new([byte[]]($blob[($_ * 16)..($_ * 16 + 15)]))
+    }
+}
+
+function Get-DesktopCount { (Get-DesktopGuids | Measure-Object).Count }
+
+function Get-DesktopNames {
+    Get-DesktopGuids | ForEach-Object {
+        $key = Join-Path $vdRoot "Desktops\{$_}"
+        $n = (Get-ItemProperty $key -Name Name -ErrorAction SilentlyContinue).Name
+        if ($n) { $n } else { "(unnamed)" }
+    }
+}
+
+Get-Process -Name 'Vdx' -ErrorAction SilentlyContinue | ForEach-Object {
+    Write-Host "stopping existing instance (pid $($_.Id))"
+    $_.Kill(); $_.WaitForExit(3000) | Out-Null
+}
+
+# Start from a clean log so the tail below covers only this run.
+if (Test-Path $log) { Remove-Item $log -Force }
+
+Write-Host "starting $exe"
+$proc = Start-Process -FilePath $exe -PassThru
+Start-Sleep -Seconds 4
+
+if ($proc.HasExited) { throw "Vdx exited immediately with code $($proc.ExitCode)" }
+Write-Host "running as pid $($proc.Id)"
+
+# The capture step needs a real foreground window to act on. charmap is a convenient
+# volunteer: plain Win32, one window per process, and never tab-merges into anything.
+Write-Host "opening a scratch Character Map window"
+$scratch = Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\charmap.exe') -PassThru
+Start-Sleep -Seconds 2
+
+Write-Host "Win+Ctrl+K  move palette, then Escape"
+Send-WinCtrl 0x4B
+Start-Sleep -Milliseconds 1400
+Send-Key $ESC
+Start-Sleep -Milliseconds 700
+
+Write-Host "Win+Ctrl+J  switch palette, then Escape"
+Send-WinCtrl 0x4A
+Start-Sleep -Milliseconds 1400
+Send-Key $ESC
+Start-Sleep -Milliseconds 700
+
+Write-Host "Win+Ctrl+U  send to last created (expected to report none yet)"
+Send-WinCtrl 0x55
+Start-Sleep -Milliseconds 1200
+
+if ($Commit) {
+    Write-Host ""
+    Write-Host "-- commit phase --"
+    Write-Host "moving the scratch window to a desktop matching '$MoveTo'"
+
+    # Bring charmap back to the front; the balloon above may have taken focus.
+    if (-not $scratch.HasExited) {
+        Add-Type -Name Fg -Namespace Smoke2 -MemberDefinition @'
+            [System.Runtime.InteropServices.DllImport("user32.dll")]
+            public static extern bool SetForegroundWindow(System.IntPtr hWnd);
+'@
+        [Smoke2.Fg]::SetForegroundWindow($scratch.MainWindowHandle) | Out-Null
+        Start-Sleep -Milliseconds 600
+    }
+
+    Send-WinCtrl 0x4B
+    Start-Sleep -Milliseconds 1200
+    Send-Text $MoveTo
+    Start-Sleep -Milliseconds 600
+    Send-Key $RET
+    Start-Sleep -Seconds 2
+
+    Write-Host "switching back to a desktop matching '$ReturnTo'"
+    Send-WinCtrl 0x4A
+    Start-Sleep -Milliseconds 1200
+    Send-Text $ReturnTo
+    Start-Sleep -Milliseconds 600
+    Send-Key $RET
+    Start-Sleep -Seconds 2
+}
+
+if ($TestCreate) {
+    Write-Host ""
+    Write-Host "-- create phase --"
+
+    $before = Get-DesktopCount
+    Write-Host "desktops before: $before"
+
+    if (-not $scratch.HasExited) {
+        Add-Type -Name Fg2 -Namespace Smoke3 -MemberDefinition @'
+            [System.Runtime.InteropServices.DllImport("user32.dll")]
+            public static extern bool SetForegroundWindow(System.IntPtr hWnd);
+'@
+        [Smoke3.Fg2]::SetForegroundWindow($scratch.MainWindowHandle) | Out-Null
+        Start-Sleep -Milliseconds 600
+    }
+
+    $name = 'Vdx Smoke Test'
+    Write-Host "creating desktop '$name' and moving the scratch window onto it"
+
+    Send-WinCtrl 0x4B
+    Start-Sleep -Milliseconds 1200
+    Send-Text $name
+    Start-Sleep -Milliseconds 600
+    Send-Key $RET
+    Start-Sleep -Seconds 3
+
+    $after = Get-DesktopCount
+    Write-Host "desktops after: $after"
+
+    # Names come straight from the registry in display order, so printing the whole
+    # order shows both that the name landed and that it was positioned correctly:
+    # the new desktop should appear immediately after the one we started on.
+    Write-Host "order now: $((Get-DesktopNames) -join ' | ')"
+
+    # Clean up: we followed the window onto the new desktop, so Win+Ctrl+F4 closes that
+    # one. Close the scratch window first, otherwise it gets relocated instead of closed.
+    if (-not $scratch.HasExited) { $scratch.Kill(); Start-Sleep -Milliseconds 600 }
+
+    Write-Host "closing the test desktop (Win+Ctrl+F4)"
+    Send-WinCtrl 0x73
+    Start-Sleep -Seconds 2
+
+    $final = Get-DesktopCount
+    Write-Host "desktops after cleanup: $final  (expected $before)"
+
+    if ($final -ne $before) {
+        Write-Warning "Desktop count did not return to $before. Check for a leftover '$name' desktop."
+    }
+}
+
+if (-not $scratch.HasExited) { $scratch.Kill() }
+
+Write-Host ""
+Write-Host "=== log: $log ==="
+if (Test-Path $log) { Get-Content $log } else { Write-Host "NO LOG FILE WAS WRITTEN" }
+
+Write-Host ""
+Write-Host "Vdx is still running as pid $($proc.Id). Stop it with:  Stop-Process -Id $($proc.Id)"

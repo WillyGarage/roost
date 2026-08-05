@@ -16,3 +16,6 @@ logs/
 
 ## Local-only config overrides
 config.local.json
+
+## published output
+dist/

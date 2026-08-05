@@ -1,15 +1,40 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <UseWPF>true</UseWPF>
+
+    <!-- WinForms is here only for NotifyIcon (WPF has no tray icon) and Screen, which
+         reports monitor working areas in physical pixels. -->
+    <UseWindowsForms>true</UseWindowsForms>
+
+    <AssemblyName>Vdx</AssemblyName>
+    <RootNamespace>Vdx.App</RootNamespace>
+
+    <!-- Runs as the invoking user. Elevation comes from the scheduled task created by
+         scripts\install-autostart.ps1, so a manual launch does not throw a UAC prompt.
+         Consequence: a manually launched instance cannot move windows owned by
+         elevated processes. See docs/NOTES.md. -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+
+    <!-- Single self-contained exe, so there is nothing to install and nothing to break
+         when a .NET runtime updates underneath it. -->
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+
+    <!-- Roughly halves the exe. Costs a one-off decompression on first launch, which is
+         irrelevant for a process that starts at logon and then stays resident.
+         Trimming is deliberately NOT enabled: it is unsupported for WPF and would break
+         XAML reflection. -->
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Vdx.Interop\Vdx.Interop.csproj" />
   </ItemGroup>
-
-  <PropertyGroup>
-    <OutputType>WinExe</OutputType>
-    <TargetFramework>net9.0-windows</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <UseWPF>true</UseWPF>
-  </PropertyGroup>
 
 </Project>

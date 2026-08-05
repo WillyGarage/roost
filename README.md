@@ -54,7 +54,53 @@ Recorded from the dev machine, 2026-08-05:
 | Displays | laptop + 1 external (virtual desktops switch both together) |
 | Also running | PowerToys FancyZones (orthogonal; moving a window between desktops preserves its zone) |
 
+## Install
+
+```powershell
+.\scripts\publish.ps1              # builds dist\Vdx.exe (single file, ~71 MB)
+.\scripts\install-autostart.ps1    # ELEVATED PowerShell: logon task + starts it now
+```
+
+The autostart step needs an elevated PowerShell because it registers a scheduled task
+that runs with highest privileges. That elevation is not decoration: moving a window
+owned by an elevated process requires this app to be elevated too. A manually launched
+(non-elevated) instance works fine for everything except admin-owned windows.
+
+`scripts\uninstall-autostart.ps1` removes the task and stops the process.
+
+## Usage
+
+| Chord | What it does |
+|---|---|
+| `Win+Ctrl+K` | Palette: move the active window to a desktop |
+| `Win+Ctrl+J` | Palette: switch desktop, moving nothing |
+| `Win+Ctrl+U` | Send the active window to the last desktop you created |
+
+In the palette: type to filter, `Enter` to confirm, `Ctrl+Enter` to invert the
+follow-or-stay behaviour for one action, `Esc` to cancel and hand focus back.
+
+Typing a name that matches no existing desktop offers to create it. Choosing that
+creates the desktop, names it, positions it directly after the one you are on, moves
+your window onto it, and follows. That is the whole "split this project out" flow in
+one gesture.
+
+An empty search box lists recently used destinations first.
+
+Right-click the tray icon for the hotkey list, the config file, and the log folder.
+
+Defaults live in `%APPDATA%\Vdx\config.json` and are re-read by "Reload config" in the
+tray menu. `Win+Ctrl+M` from the original brief is **not** used because Windows reserves
+it; run `scripts\probe-hotkeys.ps1` before choosing replacements.
+
 ## Status
 
-Pre-spike. Nothing works yet. See docs/NOTES.md for the open questions that
-determine the final architecture.
+Working end to end on Windows 11 25H2 (26200.8875), verified by
+`scripts\smoke-test.ps1 -Commit -TestCreate`:
+
+- move the active window to an existing desktop, and follow it there
+- create a desktop, name it, insert it after the current one, move the window onto it
+- switch desktops with no move
+- errors surface as tray balloons and always land in the log
+
+Not yet built: mouse-button binding, marking several windows to move together, moving
+every window of one application. See the deferred list in docs/NOTES.md.

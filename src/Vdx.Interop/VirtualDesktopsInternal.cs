@@ -95,6 +95,24 @@ public sealed class VirtualDesktopsInternal : IDisposable
     }
 
     /// <summary>
+    /// The desktop currently being viewed, straight from the shell. More reliable than
+    /// the lazily-written registry hint, and does not require having a window to ask
+    /// about the way the documented API does.
+    /// </summary>
+    public OpResult TryGetCurrentDesktop(out Guid desktopId)
+    {
+        desktopId = Guid.Empty;
+        if (_manager is null) return OpResult.Fail(-1, UnavailableReason);
+
+        var hr = _manager.GetCurrentDesktop(out var desktop);
+        if (hr != 0 || desktop is null)
+            return OpResult.Fail(hr, "GetCurrentDesktop");
+
+        hr = desktop.GetId(out desktopId);
+        return hr == 0 ? OpResult.Success : OpResult.Fail(hr, "GetId");
+    }
+
+    /// <summary>
     /// Moves any top-level window to a desktop. This is the tool's core operation.
     /// </summary>
     public OpResult TryMoveWindow(IntPtr hWnd, Guid desktopId)

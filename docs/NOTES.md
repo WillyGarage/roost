@@ -139,6 +139,31 @@ parameter is declared `IntPtr` and the string is created with `WindowsCreateStri
 freed with `WindowsDeleteString` from `combase.dll`. `GetName` is simply not declared;
 names come from the registry, which needs no COM.
 
+## Hotkey availability, 2026-08-05
+
+`Win+Ctrl+M` from the original spec **cannot be used**: Windows reserves it for
+Magnifier settings, and `RegisterHotKey` returns error 1409. `Win+Ctrl+L`,
+`Win+Ctrl+O`, `Win+Ctrl+Space`, `Win+Ctrl+Enter`, `Win+Alt+M`, `Win+Alt+K`,
+`Win+Alt+Space`, `Win+Shift+M` and `Ctrl+Alt+K` are also taken on this machine.
+
+Defaults chosen from what actually probed free, staying inside the `Win+Ctrl` family
+because that is already Windows' own virtual-desktop modifier prefix:
+
+| Chord | Action |
+|---|---|
+| `Win+Ctrl+K` | palette: move the active window |
+| `Win+Ctrl+J` | palette: switch desktop, no move |
+| `Win+Ctrl+U` | send active window to the last desktop created |
+
+Run `scripts\probe-hotkeys.ps1` to re-check on any machine. Do not guess.
+
+`RegisterHotKey` is used rather than a low-level keyboard hook, deliberately: it never
+sees keystrokes it did not claim, so it cannot leak input or swallow keys. The cost is
+that it handles keyboard chords only, which is why the mouse side button is not bound
+by default. `XButton1` is browser Back, and a low-level mouse hook would have to
+swallow it globally to claim it. The clean answer is to map a spare mouse button to one
+of these chords in the mouse's own vendor software.
+
 ## Deferred / known limitations
 
 - **Elevation.** Moving a window owned by an elevated process requires this app to be
