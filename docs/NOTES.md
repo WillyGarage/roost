@@ -28,11 +28,13 @@ tier wherever possible.
 | Enumerate desktops, in display order | `HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VirtualDesktops` → `VirtualDesktopIDs` (REG_BINARY, packed 16-byte GUIDs) | Stable. No COM. |
 | Desktop names | `HKCU\...\Explorer\VirtualDesktops\Desktops\{GUID}` → `Name` (REG_SZ) | Stable. No COM. |
 | Which desktop is current | documented `IVirtualDesktopManager::GetWindowDesktopId(hwnd)` on the HWND we captured at hotkey time — that window is by definition on the current desktop | Stable. Documented API. |
-| Move a window to a desktop | documented `IVirtualDesktopManager::MoveWindowToDesktop(hwnd, guid)`; fallback to internal `IVirtualDesktopManagerInternal::MoveViewToDesktop` | **Unverified cross-process. See Q1.** |
-| Create a desktop | internal `CreateDesktopW`; fallback `Win+Ctrl+D` via SendInput | Versioned |
-| Rename a desktop | write registry `Name`; plus internal `SetName` to force the Task View UI to refresh | Registry tier is stable |
-| Switch desktop | internal `SwitchDesktop`; fallback N × `Win+Ctrl+←/→` | Versioned |
-| Reorder ("insert after current") | internal `MoveDesktop` (exists only on 22H2+, where Task View gained drag-reorder) | Versioned. **See Q2.** |
+| Read which desktop a window is on | documented `IVirtualDesktopManager::GetWindowDesktopId` — works cross-process | Stable. Documented API. |
+| **Move a window to a desktop** | internal `MoveViewToDesktop` + `IApplicationViewCollection::GetViewForHwnd`. The documented `MoveWindowToDesktop` **cannot** do this (see Q1) | **Versioned. No fallback exists.** |
+| Create a desktop | internal `CreateDesktop`; fallback `Win+Ctrl+D` + registry diff | Versioned, with fallback |
+| Rename a desktop | internal `SetDesktopName`; fallback registry `Name` write | Versioned, with fallback |
+| Switch desktop | internal `SwitchDesktop`; fallback N × `Win+Ctrl+←/→` | Versioned, with fallback |
+| Reorder ("insert after current") | internal `MoveDesktop(desktop, index)` | Versioned, no fallback (cosmetic only) |
+| Is a window movable at all | internal `CanViewMoveDesktops` | Versioned |
 
 Consequences:
 
@@ -40,9 +42,12 @@ Consequences:
    `CLSID_ImmersiveShell`, then try each known candidate IID in order until
    `QueryInterface` succeeds; cache the winner. Build-number tables are precisely how
    these tools die on Patch Tuesday.
-2. **Every versioned operation needs a keystroke fallback,** so a broken update
-   degrades the tool instead of killing it. The stable tier alone still gives us
-   list + names + current-desktop, which is most of the palette.
+2. **Every versioned operation gets a keystroke fallback where one exists,** so a
+   broken update degrades the tool instead of killing it. Note the important
+   exception: **there is no fallback for moving a window.** Windows ships no hotkey
+   for it, so if the internal interface breaks, the tool's core function breaks with
+   it. Create, rename, switch, list and names all survive. Plan for the interface
+   check to run at startup and say so loudly rather than failing silently per action.
 3. Because desktops are addressed by GUID and name, never by index, reordering
    desktops cannot corrupt anything we persist.
 
@@ -70,28 +75,69 @@ already does this correctly.
 **`CurrentVirtualDesktop` registry hint was accurate** at the time of the run, but it
 is still only a hint; the documented `GetWindowDesktopId` path remains the plan.
 
-## Open questions the spike must answer
+## Spike results — all questions closed, 2026-08-05
 
-**Q1 — Does documented `MoveWindowToDesktop` work cross-process?**
-This is the load-bearing call for the entire acceptance criteria. There are
-longstanding reports of it returning `E_ACCESSDENIED` for windows owned by other
-processes, which is every window that matters here. If it fails, the core move has to
-go through undocumented `MoveViewToDesktop` (which needs an `IApplicationView` for the
-HWND, via `IApplicationViewCollection::GetViewForHwnd`), and the stability story
-above gets meaningfully worse.
-Test: launch Notepad, grab its HWND, try to move it.
+Run `dotnet run --project spike\Vdx.Spike` for the read-only + keystroke round, and
+`-- --internal` for the undocumented-interface round.
 
-**Q2 — Does `IVirtualDesktopManagerInternal::MoveDesktop` exist and work on 26200?**
-Determines whether "insert new desktop after the current one" is achievable or whether
-new desktops are stuck at the far right. Not a blocker for v1; the workflow is
-tolerable without it since we address desktops by name.
+**Q1 — documented `MoveWindowToDesktop` cross-process: NO.**
+Returns `E_ACCESSDENIED` (0x80070005) for a window owned by another process, verified
+against a `charmap.exe` window. Reading is fine: `GetWindowDesktopId` and
+`IsWindowOnCurrentVirtualDesktop` both work cross-process. So the documented API is
+useful only as a *reader*, and the core move must use internal `MoveViewToDesktop`.
 
-**Q3 — Does writing the registry `Name` value alone refresh the Task View UI,**
-or is internal `SetName` required? If the registry write suffices, renaming drops to
-the stable tier.
+That was the plan's biggest hope and it is dead. The tool depends on undocumented COM
+for its central operation, with no fallback. Everything else still degrades gracefully.
 
-**Q4 — Which IID set does 26200 accept** for `IVirtualDesktopManagerInternal`,
-`IVirtualDesktop`, and `IApplicationViewCollection`? Record the winners here.
+**Internal `MoveViewToDesktop`: YES.** `GetViewForHwnd` → `FindDesktop` →
+`MoveViewToDesktop` moves another process's window correctly, verified by reading the
+window's desktop back with the documented API. `CanViewMoveDesktops` returned true and
+is the right pre-check for pinned or unmovable windows.
+
+**Q2 — `MoveDesktop` reorder: YES.** A freshly created desktop was moved from position
+14 to position 2, i.e. directly after the current desktop. "Insert after current" is
+achievable; no far-right-then-drag needed. Indices are zero-based.
+
+**Q3 — rename: YES, both ways.** Writing the registry `Name` value persists and reads
+back. Internal `SetDesktopName` also works and is preferred, since going through the
+shell keeps Task View in sync by construction (it writes the same registry value).
+HSTRING note below.
+
+**Q4 — IIDs accepted on build 26200.8875:**
+
+| Interface | IID | Notes |
+|---|---|---|
+| `IVirtualDesktopManagerInternal` | `{53F5CA0B-158F-4124-900C-057158060B27}` | The 24H2 generation. Matches the vtable layout with `SwitchDesktopAndMoveForegroundView` at slot 8. |
+| `IApplicationViewCollection` | `{1841C6D7-4F9D-42C0-AF41-8747538F10E5}` | Unchanged since Win10 1809. |
+| `IVirtualDesktopPinnedApps` | `{4CE81583-1E4C-4632-A621-07A53543148F}` | For detecting/undoing "show on all desktops". |
+| `IVirtualDesktop` | `{3F07F4BE-B107-441A-AF0F-39D82529072C}` | |
+| `IApplicationView` | `{372E1D3B-38D3-42E4-A15B-8AB2B178F513}` | |
+| `IObjectArray` | `{92CA9DCD-5622-4BBA-A805-5E9F541BD8C9}` | |
+
+All four 22H2-and-earlier candidate IIDs returned `E_NOINTERFACE`, confirming the
+probe-don't-guess approach was necessary. Note `{4970BA3D-FD4E-4647-BEA3-D89076EF4B9C}`
+*also* QueryService'd successfully; it is not the interface we want and its layout is
+unknown, so ignore it. Vtable layout cross-checked against MScholtes/VirtualDesktop
+`VirtualDesktop11-24H2.cs` v1.21 (2025-08-11).
+
+**Vtable sanity gate.** `GetCount` is slot 1 in every published version, so it is safe
+to call before trusting the rest. `InternalSpike` compares it against the registry
+desktop count and refuses to call another slot if they disagree. Keep that gate: it is
+the cheap check that catches a wrong interface before a wrong call does damage.
+
+**Additional wins beyond the original plan:**
+
+- `SwitchDesktop` gives instant, animation-free switching in both directions, so the
+  keystroke fallback is only ever a degraded mode.
+- `CreateDesktop` creates *without* switching to it, unlike `Win+Ctrl+D`. That means
+  "send this window to a new desktop and stay put" is possible, and the Ctrl-modifier
+  behaviour in the spec comes free.
+
+**HSTRING caveat.** `SetDesktopName` and `IVirtualDesktop::GetName` take/return
+`HSTRING`. Built-in `UnmanagedType.HString` marshalling was removed in .NET 5, so the
+parameter is declared `IntPtr` and the string is created with `WindowsCreateString` /
+freed with `WindowsDeleteString` from `combase.dll`. `GetName` is simply not declared;
+names come from the registry, which needs no COM.
 
 ## Deferred / known limitations
 
