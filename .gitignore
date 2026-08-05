@@ -1,0 +1,18 @@
+## .NET build output
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+artifacts/
+publish/
+*.user
+*.suo
+.vs/
+.idea/
+
+## Logs produced by the app at runtime (see docs/NOTES.md: elevated apps have no console)
+*.log
+logs/
+
+## Local-only config overrides
+config.local.json

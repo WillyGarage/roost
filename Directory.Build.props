@@ -1,0 +1,20 @@
+<Project>
+
+  <!-- Shared across all projects. Windows-only TFM: the whole tool is registry +
+       COM interop against the Windows shell, and Vdx.App is WPF. -->
+  <PropertyGroup>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- COM interop declarations are hand-written and vtable-order sensitive;
+         source-generated COM (ComWrappers) is not used, so keep the built-in
+         runtime marshalling enabled. -->
+    <EnableComHosting>false</EnableComHosting>
+
+    <!-- Version stamped into the exe so a stale build is identifiable in logs. -->
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+
+</Project>

@@ -1,0 +1,6 @@
+# Repo lives on the Windows filesystem (C:\dev) but is often driven from WSL.
+# Normalize in the index, check out CRLF on Windows so MSBuild/PowerShell are happy.
+* text=auto eol=crlf
+*.sh text eol=lf
+*.png binary
+*.ico binary
