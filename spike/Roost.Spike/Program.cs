@@ -165,6 +165,100 @@ if (args.Contains("--switch"))
     return switched.Ok ? 0 : 1;
 }
 
+// Move a window to a desktop, both matched loosely. A repair tool for when a test moves
+// the wrong window - the palette captures the real foreground, which is not always the
+// scratch window - and a deterministic way for a test to place a specific window without
+// depending on SetForegroundWindow actually sticking.
+//   --move "Character Map" "Comm"      (title fragment, then desktop name or 1-based pos)
+if (args.Contains("--move"))
+{
+    var rest       = args.SkipWhile(a => a != "--move").Skip(1).ToArray();
+    var titlePart  = rest.ElementAtOrDefault(0);
+    var deskWanted = rest.ElementAtOrDefault(1);
+
+    if (string.IsNullOrWhiteSpace(titlePart) || string.IsNullOrWhiteSpace(deskWanted))
+    {
+        Console.WriteLine("usage: --move \"<window title fragment>\" \"<desktop name or 1-based position>\"");
+        return 1;
+    }
+
+    // Internal mover: the documented MoveWindowToDesktop returns E_ACCESSDENIED for
+    // windows owned by other processes, which is every window worth moving. Documented
+    // reader is fine for verifying where it landed afterwards.
+    using var mover  = new VirtualDesktopsInternal();
+    using var reader = new VirtualDesktops();
+
+    if (!mover.Available)
+    {
+        Console.WriteLine($"unavailable: {mover.UnavailableReason}");
+        return 1;
+    }
+
+    var all = DesktopRegistry.List();
+
+    var desk = int.TryParse(deskWanted, out var pos)
+        ? all.FirstOrDefault(d => d.Index == pos - 1)
+        : all.FirstOrDefault(d => d.DisplayName.Equals(deskWanted, StringComparison.OrdinalIgnoreCase))
+          ?? all.FirstOrDefault(d => d.DisplayName.Contains(deskWanted, StringComparison.OrdinalIgnoreCase));
+
+    if (desk is null)
+    {
+        Console.WriteLine($"no desktop matching \"{deskWanted}\"");
+        return 1;
+    }
+
+    // Either an exact window handle (0x...) when the title is ambiguous, or the first
+    // visible top-level window whose title contains the fragment. Our own windows are
+    // skipped either way.
+    var self = Environment.ProcessId;
+    var hWnd = IntPtr.Zero;
+
+    long handleValue = 0;
+    var byHandle = titlePart.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
+                   && long.TryParse(titlePart.AsSpan(2),
+                           System.Globalization.NumberStyles.HexNumber, null, out handleValue);
+
+    foreach (var h in Native.GetTopLevelWindows())
+    {
+        Native.GetWindowThreadProcessId(h, out var pid);
+        if (pid == self)
+            continue;
+
+        var matches = byHandle
+            ? h == new IntPtr(handleValue)
+            : Native.GetWindowTitle(h).Contains(titlePart, StringComparison.OrdinalIgnoreCase);
+
+        if (matches)
+        {
+            hWnd = h;
+            break;
+        }
+    }
+
+    if (hWnd == IntPtr.Zero)
+    {
+        Console.WriteLine(byHandle
+            ? $"no visible top-level window with handle {titlePart}"
+            : $"no window with a title containing \"{titlePart}\"");
+        return 1;
+    }
+
+    var title = Native.GetWindowTitle(hWnd);
+    var move = mover.TryMoveWindow(hWnd, desk.Id);
+
+    if (!move.Ok)
+    {
+        Console.WriteLine($"failed to move \"{Truncate(title, 50)}\": {move.Describe()}");
+        return 1;
+    }
+
+    Thread.Sleep(200);
+    var landed = reader.TryGetDesktopId(hWnd, out var nowOn).Ok && nowOn == desk.Id;
+    Console.WriteLine($"moved \"{Truncate(title, 50)}\" -> {desk.Index + 1}. {desk.DisplayName}" +
+                      (landed ? "" : " (WARNING: verify says it did not land)"));
+    return landed ? 0 : 1;
+}
+
 // Authoritative "which desktop am I on", straight from the shell rather than the
 // lazily-written registry hint. Used by switch-bug.ps1 to check whether a switch stuck.
 if (args.Contains("--current"))

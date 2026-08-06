@@ -639,10 +639,35 @@ public partial class PaletteWindow : Window
     }
 
     /// <summary>
+    /// Remembers the desktop we are leaving so it floats to the top of the list next time
+    /// the palette opens. That makes the very next "hotkey, Enter" a return to where we
+    /// just were, the way Alt+Tab returns to the previous window. Recorded for every action
+    /// that lands us on a different desktop: go, move-and-follow, and create-and-go.
+    /// </summary>
+    private void RecordDeparture(Guid target)
+    {
+        if (_currentDesktop is { } from && from != target)
+            _state.RecordDestination(from, _config.RecentDestinationCount);
+    }
+
+    /// <summary>
+    /// Keeps the view on the desktop we are on after a move-and-stay. Delegates to
+    /// DesktopService.HoldForegroundOn, which must run while the palette still owns the
+    /// foreground, i.e. after Hide but before Close.
+    /// </summary>
+    private void StayPut()
+    {
+        if (_currentDesktop is { } here)
+            _desktops.HoldForegroundOn(here, exclude: _captured);
+    }
+
+    /// <summary>
     /// Hides and acts while this window still owns the foreground. Switching depends on
     /// that: DesktopService.SwitchTo has to claim the foreground on the destination to stop
     /// the previously focused window pulling us back, and Windows only honours that from
     /// the process that currently has it. Closing first would surrender the right too soon.
+    /// The same ownership is what lets a move-and-stay anchor the source desktop via
+    /// <see cref="StayPut"/> before closing.
     /// </summary>
     private void MoveAndClose(Guid target, bool follow)
     {
@@ -651,21 +676,43 @@ public partial class PaletteWindow : Window
 
         try
         {
-            // Already there: moving would be a no-op, so honour the follow intent rather
-            // than reporting a success that changed nothing.
+            // Already there: moving would be a no-op, so honour the follow-or-stay intent
+            // rather than reporting a success that changed nothing.
             if (_capturedWindowDesktop == target)
             {
-                if (follow && _currentDesktop != target
-                    && !_desktops.SwitchTo(target, out var goError))
-                    _reportError(goError ?? "Could not switch desktops.");
+                if (follow)
+                {
+                    if (_currentDesktop != target)
+                    {
+                        if (_desktops.SwitchTo(target, out var goError))
+                            RecordDeparture(target);
+                        else
+                            _reportError(goError ?? "Could not switch desktops.");
+                    }
+                }
+                else if (target != _currentDesktop)
+                {
+                    // The window already lives on another desktop and we are staying put;
+                    // anchor the view here so closing does not chase the window over.
+                    StayPut();
+                }
 
                 return;
             }
 
             if (_desktops.MoveWindow(_captured, target, follow, out var moveError))
+            {
                 _state.RecordDestination(target, _config.RecentDestinationCount);
+
+                if (follow)
+                    RecordDeparture(target);
+                else
+                    StayPut();
+            }
             else
+            {
                 _reportError(moveError ?? "Could not move the window.");
+            }
         }
         catch (Exception ex)
         {
@@ -685,7 +732,9 @@ public partial class PaletteWindow : Window
 
         try
         {
-            if (!_desktops.SwitchTo(target, out var error))
+            if (_desktops.SwitchTo(target, out var error))
+                RecordDeparture(target);
+            else
                 _reportError(error ?? "Could not switch desktops.");
         }
         catch (Exception ex)
@@ -718,13 +767,27 @@ public partial class PaletteWindow : Window
 
             if (_mode == Mode.MoveWindow && _captured != IntPtr.Zero && action != ConfirmAction.Go)
             {
-                if (_desktops.MoveWindow(
-                        _captured, created, action == ConfirmAction.MoveAndFollow, out var moveError))
+                var follow = action == ConfirmAction.MoveAndFollow;
+
+                if (_desktops.MoveWindow(_captured, created, follow, out var moveError))
+                {
                     _state.RecordDestination(created, _config.RecentDestinationCount);
+
+                    if (follow)
+                        RecordDeparture(created);
+                    else
+                        StayPut();
+                }
                 else
+                {
                     _reportError(moveError ?? "Could not move the window.");
+                }
             }
-            else if (!_desktops.SwitchTo(created, out var switchError))
+            else if (_desktops.SwitchTo(created, out var switchError))
+            {
+                RecordDeparture(created);
+            }
+            else
             {
                 _reportError(switchError ?? "Could not switch to the new desktop.");
             }

@@ -190,15 +190,26 @@ public sealed class DesktopService : IDisposable
     /// <summary>
     /// The frontmost ordinary window on a given desktop, or zero if it has none.
     /// EnumWindows walks top-level windows in Z-order, front to back, so the first match
-    /// is the one the user would consider "on top".
+    /// is the one the user would consider "on top". <paramref name="exclude"/> skips a
+    /// specific window, used to ignore one we have just moved away whose recorded desktop
+    /// may not have caught up yet.
+    ///
+    /// <paramref name="skipGhosts"/> drops windows the shell has cloaked. That is only
+    /// meaningful when <paramref name="desktopId"/> is the current desktop: a cloaked
+    /// window there is a ghost (a suspended UWP app), not something on screen, so it is a
+    /// poor thing to hand the foreground to. Off the current desktop every window is
+    /// cloaked, so callers targeting another desktop must leave this false or find nothing.
     /// </summary>
-    private IntPtr TopWindowOn(Guid desktopId)
+    private IntPtr TopWindowOn(Guid desktopId, IntPtr exclude = default, bool skipGhosts = false)
     {
         var shell = Native.GetShellWindow();
 
         foreach (var hWnd in Native.GetTopLevelWindows())
         {
-            if (hWnd == shell)
+            if (hWnd == shell || hWnd == exclude)
+                continue;
+
+            if (skipGhosts && Native.IsCloaked(hWnd) != 0)
                 continue;
 
             if (_documented.TryGetDesktopId(hWnd, out var id).Ok && id == desktopId)
@@ -206,6 +217,41 @@ public sealed class DesktopService : IDisposable
         }
 
         return IntPtr.Zero;
+    }
+
+    /// <summary>
+    /// Pins the foreground to <paramref name="desktopId"/> after a move-and-stay, so the
+    /// view does not follow the window that was just moved off it.
+    ///
+    /// When the palette closes, Windows restores activation to whatever was focused when
+    /// it opened - the captured window. After that window has been moved to another
+    /// desktop, restoring it drags the view along, because activating a window that lives
+    /// elsewhere switches Windows to it. That is the same mechanism <see cref="SwitchTo"/>
+    /// defends against, only here the goal is to stay rather than to go. Claiming the
+    /// foreground on a window still on this desktop leaves the close nothing to pull us
+    /// away with. Only effective while the caller still owns the foreground, which is why
+    /// the palette does this before it closes.
+    ///
+    /// <paramref name="exclude"/> is the just-moved window, skipped in case its recorded
+    /// desktop has not updated. Falls back to the shell (desktop) window when nothing else
+    /// remains here, which still anchors the view to this desktop.
+    /// </summary>
+    public void HoldForegroundOn(Guid desktopId, IntPtr exclude = default)
+    {
+        // Ghosts skipped: this always runs on the desktop we are staying on, so a cloaked
+        // window here is a suspended app, not a real anchor. Handing it the foreground
+        // might not hold, which would let the close-restore drag us away after all. Better
+        // to fall through to the shell window than trust a ghost.
+        var anchor = TopWindowOn(desktopId, exclude, skipGhosts: true);
+
+        if (anchor == IntPtr.Zero)
+            anchor = Native.GetShellWindow();
+
+        if (anchor == IntPtr.Zero)
+            return;
+
+        VirtualDesktops.ActivateWindow(anchor);
+        Log.Info($"held the view on the source desktop via \"{Truncate(Native.GetWindowTitle(anchor))}\"");
     }
 
     /// <summary>

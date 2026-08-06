@@ -105,6 +105,39 @@ Two consequences worth remembering:
 plain Win32 window focused and once with a UWP window, because only the second one
 catches this.
 
+**2026-08-06 — "move and stay" (Ctrl+Enter) followed the window; the palette had no memory
+of the previous desktop.** Two palette fixes, the first of which is the switch bug above in
+reverse.
+
+*Ctrl+Enter followed instead of staying.* `MoveViewToDesktop` does not switch, so on paper
+"stay" needed no extra work. But the palette closes right after the move, and closing
+restores activation to the window that was focused when it opened — the captured window,
+which now lives on the destination. Activating a window on another desktop switches Windows
+to it, so the close dragged the view across and "stay" became "follow". The fix is the
+mirror image of the switch-bug fix: after a stay-move, while the palette still owns the
+foreground, `SetForegroundWindow` a window that is *still on the source desktop*
+(`DesktopService.HoldForegroundOn`), leaving the close nothing to pull us away with. It
+falls back to the shell/desktop window when the source is now empty, and skips cloaked
+"ghost" windows there (suspended apps that would not reliably hold the foreground). Applied
+to every stay-move, onto an existing desktop or a freshly created one.
+
+*No return-to-previous.* Switching left no trace, so reopening the palette defaulted to the
+first desktop, not to where you just were. Now every action that lands on a *different*
+desktop — go, move-and-follow, create-and-go — records the desktop it left as the
+most-recent destination (`RecordDeparture`), floating it to the top of the empty-query
+list. So "hotkey, Enter" is a return-to-previous toggle, the way Alt+Tab returns to the
+last window. It reuses the existing `RecentDestinations` MRU, and the departed desktop
+always outranks the destination, so Enter is never a no-op against the desktop you just
+arrived on.
+
+`scripts\stay-and-return.ps1` is the regression test: it moves a scratch window with
+Ctrl+Enter and asserts the view stayed put *and* the window landed, then switches and
+asserts a bare Enter returns to the previous desktop. Forcing the scratch window to the
+foreground must use `AttachThreadInput`, never a keystroke nudge — the palette reads
+modifier state on Enter, so an injected Alt silently corrupts the action under test (this
+cost a full test run to learn). `spike --move "<title fragment | 0xHWND>" "<desktop>"` was
+added alongside it as the deterministic repair tool for when a test moves the wrong window.
+
 ## Spike results — all questions closed, 2026-08-05
 
 Run `dotnet run --project spike\Roost.Spike` for the read-only + keystroke round, and
