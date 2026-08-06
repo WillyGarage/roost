@@ -57,16 +57,33 @@ Recorded from the dev machine, 2026-08-05:
 ## Install
 
 ```powershell
-.\scripts\publish.ps1              # builds dist\Vdx.exe (single file, ~71 MB)
-.\scripts\install-autostart.ps1    # ELEVATED PowerShell: logon task + starts it now
+.\scripts\publish.ps1     # builds dist\Vdx.exe (single file, ~71 MB)
 ```
 
-The autostart step needs an elevated PowerShell because it registers a scheduled task
-that runs with highest privileges. That elevation is not decoration: moving a window
-owned by an elevated process requires this app to be elevated too. A manually launched
-(non-elevated) instance works fine for everything except admin-owned windows.
+Then set up autostart. Easiest is the `.cmd` wrapper, which self-elevates and bypasses
+the execution policy for its own process only:
 
-`scripts\uninstall-autostart.ps1` removes the task and stops the process.
+```
+scripts\install-autostart.cmd     (approve the UAC prompt)
+```
+
+Both of those are needed and neither is obvious. Registering a highest-privileges
+scheduled task requires admin, and Windows' default execution policy refuses to run a
+`.ps1` from disk at all, so calling the PowerShell script directly fails with
+`running scripts is disabled on this system` even from an elevated prompt. To do it by
+hand instead:
+
+```powershell
+# in an ELEVATED PowerShell
+Set-ExecutionPolicy -Scope Process Bypass -Force
+.\scripts\install-autostart.ps1
+```
+
+The task runs at highest privileges. That *may* matter for moving windows owned by
+elevated processes, though see the elevation note in docs/NOTES.md: the requirement is
+assumed, not verified. It costs nothing either way.
+
+`scripts\uninstall-autostart.cmd` removes the task and stops the process.
 
 ## Usage
 
