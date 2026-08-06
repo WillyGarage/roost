@@ -11,13 +11,11 @@ namespace Vdx.App;
 
 /// <summary>
 /// The single window the whole app is driven from. One hotkey opens it, and every desktop
-/// operation is reachable from here: move the active window, switch, create, rename,
-/// reorder, delete.
+/// operation is a key on the highlighted row: move the active window, go there, create,
+/// rename, reorder, delete.
 ///
-/// Design rule: the common case must not pay for the rare ones. Moving the active window
-/// stays "hotkey, type three letters, Enter". Everything else is a distinct key on the
-/// selected row, with Tab opening a discoverable list of what those keys are, so nothing
-/// has to be memorised to be found.
+/// There is no hidden menu. Every key is printed along the bottom, because a shortcut you
+/// have to go looking for is a shortcut you will not use.
 /// </summary>
 public partial class PaletteWindow : Window
 {
@@ -31,46 +29,33 @@ public partial class PaletteWindow : Window
         SwitchDesktop
     }
 
-    /// <summary>Which screen of the palette is showing.</summary>
     private enum Stage
     {
         /// <summary>The desktop list. Everything starts and returns here.</summary>
         Desktops,
 
-        /// <summary>What-can-I-do-with-this list for one desktop.</summary>
-        Actions,
-
         /// <summary>Editing one desktop's name in the search box.</summary>
         Rename,
 
-        /// <summary>Showing exactly what a delete would affect, awaiting confirmation.</summary>
-        ConfirmDelete
-    }
-
-    private enum Act
-    {
-        MoveHere,
-        MoveHereAndStay,
-        SwitchTo,
-        Rename,
-        MoveEarlier,
-        MoveLater,
-        Delete
+        /// <summary>Choosing where a doomed desktop's windows should go.</summary>
+        DeleteChooseTarget
     }
 
     private sealed class Row
     {
         public string Display { get; init; } = "";
+
+        /// <summary>Status words: current, recent, window is here.</summary>
         public string Badge { get; init; } = "";
+
+        /// <summary>Window count, bare number, right-aligned in its own column.</summary>
+        public string Count { get; init; } = "";
 
         /// <summary>Set on desktop rows.</summary>
         public Guid? DesktopId { get; init; }
 
         /// <summary>Set on the create-a-new-desktop row.</summary>
         public string? NewName { get; init; }
-
-        /// <summary>Set on rows in the Actions stage.</summary>
-        public Act? Action { get; init; }
 
         /// <summary>False for informational rows that do nothing when chosen.</summary>
         public bool Selectable { get; init; } = true;
@@ -97,7 +82,7 @@ public partial class PaletteWindow : Window
     /// <summary>Suppresses filtering while the search box is being used for a rename.</summary>
     private bool _suppressFilter;
 
-    /// <summary>The desktop the Actions / Rename / ConfirmDelete stages are working on.</summary>
+    /// <summary>The desktop being renamed or deleted.</summary>
     private Guid _subject;
 
     private List<Row> _allDesktops = [];
@@ -143,10 +128,11 @@ public partial class PaletteWindow : Window
         var desktops = _desktops.List();
         _state.SnapshotNames(desktops);
 
-        // Grouped once, so the counts on each row and the list shown before a delete are
-        // guaranteed to agree with each other.
+        // Grouped once, so the counts on each row and the list of windows a delete would
+        // relocate are guaranteed to agree with each other.
         _windowsByDesktop = _desktops.GroupWindowsByDesktop();
         _windowCounts = _windowsByDesktop.ToDictionary(kv => kv.Key, kv => kv.Value.Count);
+
         _currentDesktop = _desktops.GetCurrentDesktopId(_captured);
         _capturedWindowDesktop = _mode == Mode.MoveWindow && _captured != IntPtr.Zero
             ? _desktops.GetWindowDesktopId(_captured)
@@ -159,6 +145,7 @@ public partial class PaletteWindow : Window
             DesktopId = d.Id,
             Index = d.Index,
             Display = $"{d.Index + 1}.  {d.DisplayName}",
+            Count = CountOn(d.Id).ToString(),
             Badge = BadgeFor(d, recency)
         }).ToList();
     }
@@ -171,17 +158,7 @@ public partial class PaletteWindow : Window
 
     private string BadgeFor(VirtualDesktopInfo d, Dictionary<Guid, int> recency)
     {
-        var parts = new List<string>(4);
-
-        // Window count first: it is the most useful thing on the row. It tells you which
-        // desktops are live and, just as usefully, which are empty and worth deleting.
-        var count = _windowCounts.TryGetValue(d.Id, out var n) ? n : 0;
-        parts.Add(count switch
-        {
-            0 => "empty",
-            1 => "1 window",
-            _ => $"{count} windows"
-        });
+        var parts = new List<string>(3);
 
         if (d.Id == _currentDesktop)
             parts.Add("current");
@@ -223,16 +200,37 @@ public partial class PaletteWindow : Window
 
         HeaderText.Text = _mode switch
         {
-            Mode.MoveWindow when title.Length > 0 => $"Move  “{Trim(title, 60)}”  to:",
+            Mode.MoveWindow when title.Length > 0 => $"Move  “{Trim(title, 70)}”  to:",
             Mode.MoveWindow => "Move the active window to:",
             _ => "Go to desktop:"
         };
 
-        FooterText.Text = _mode == Mode.MoveWindow
-            ? "Enter  move" + (_config.FollowWindowAfterMove ? " and follow" : "") +
-              "     Ctrl+Enter  " + (_config.FollowWindowAfterMove ? "move and stay" : "move and follow") +
-              "     Alt+Enter  just go there     Tab  more…     Esc  cancel"
-            : "Enter  go there     Tab  more…     Esc  cancel";
+        // Every key, spelled out. This is the only place they are documented in the UI, so
+        // it has to be complete rather than tidy.
+        var keys = new List<string>();
+
+        if (_mode == Mode.MoveWindow)
+        {
+            keys.Add(_config.FollowWindowAfterMove
+                ? "Enter  move and follow"
+                : "Enter  move and stay");
+            keys.Add(_config.FollowWindowAfterMove
+                ? "Ctrl+Enter  move and stay"
+                : "Ctrl+Enter  move and follow");
+            keys.Add("Alt+Enter  go there");
+        }
+        else
+        {
+            keys.Add("Enter  go there");
+        }
+
+        keys.Add("F2  rename");
+        keys.Add("Ctrl+↑ Ctrl+↓  reorder");
+        keys.Add("Alt+Delete  delete");
+        keys.Add("type a new name  create");
+        keys.Add("Esc  cancel");
+
+        FooterText.Text = string.Join("      ", keys);
 
         ApplyFilter(Query.Text);
 
@@ -243,75 +241,6 @@ public partial class PaletteWindow : Window
         Keyboard.Focus(Query);
     }
 
-    private void ShowActionsStage(Guid desktopId)
-    {
-        _stage = Stage.Actions;
-        _subject = desktopId;
-
-        // The search box has no meaning here, and hiding it makes the change of context
-        // obvious rather than leaving a box that silently ignores typing.
-        Query.Visibility = Visibility.Collapsed;
-
-        var count = CountOn(desktopId);
-        var position = _desktops.List().FirstOrDefault(d => d.Id == desktopId)?.Index ?? 0;
-        var total = _desktops.List().Count;
-
-        HeaderText.Text = $"“{NameOf(desktopId)}”  —  position {position + 1} of {total}, " +
-                          (count == 1 ? "1 window" : $"{count} windows");
-
-        var rows = new List<Row>();
-        var index = 0;
-
-        if (_mode == Mode.MoveWindow && _captured != IntPtr.Zero)
-        {
-            rows.Add(new Row
-            {
-                Action = Act.MoveHere, Index = index++,
-                Display = "Move the window here and follow it", Badge = "M"
-            });
-            rows.Add(new Row
-            {
-                Action = Act.MoveHereAndStay, Index = index++,
-                Display = "Move the window here, stay where I am", Badge = "K"
-            });
-        }
-
-        rows.Add(new Row
-        {
-            Action = Act.SwitchTo, Index = index++,
-            Display = "Go to this desktop", Badge = "G"
-        });
-        rows.Add(new Row
-        {
-            Action = Act.Rename, Index = index++,
-            Display = "Rename this desktop", Badge = "R  or  F2"
-        });
-        rows.Add(new Row
-        {
-            Action = Act.MoveEarlier, Index = index++,
-            Display = "Move it one position earlier", Badge = "[  or  Ctrl+↑"
-        });
-        rows.Add(new Row
-        {
-            Action = Act.MoveLater, Index = index++,
-            Display = "Move it one position later", Badge = "]  or  Ctrl+↓"
-        });
-        rows.Add(new Row
-        {
-            Action = Act.Delete, Index = index++,
-            Display = "Delete this desktop", Badge = "D  or  Alt+Del"
-        });
-
-        Items.ItemsSource = rows;
-        Items.SelectedIndex = 0;
-
-        FooterText.Text = "Enter  do it     Esc  back to the list";
-
-        // Focus the list rather than the hidden search box so arrow keys work natively.
-        Items.Focus();
-        Keyboard.Focus(Items);
-    }
-
     private void ShowRenameStage(Guid desktopId)
     {
         _stage = Stage.Rename;
@@ -320,12 +249,12 @@ public partial class PaletteWindow : Window
         var current = NameOf(desktopId);
 
         HeaderText.Text = $"Rename  “{current}”  to:";
-        FooterText.Text = "Enter  save     Esc  cancel";
+        FooterText.Text = "Enter  save      Esc  cancel";
 
         Query.Visibility = Visibility.Visible;
 
-        // Reuse the search box as the edit field: no new UI, and the caret is already
-        // where the user expects to type. Pre-selected so typing replaces the old name.
+        // Reuse the search box as the edit field: no new UI, and the caret is already where
+        // the user expects to type. Pre-selected so typing replaces the old name.
         _suppressFilter = true;
         Query.Text = current;
         _suppressFilter = false;
@@ -337,8 +266,7 @@ public partial class PaletteWindow : Window
                 Selectable = false,
                 Display = CountOn(desktopId) == 0
                     ? "This desktop is empty."
-                    : $"{CountOn(desktopId)} window(s) here. Renaming does not move anything.",
-                Badge = ""
+                    : $"{CountOn(desktopId)} window(s) here. Renaming does not move anything."
             }
         };
 
@@ -347,53 +275,74 @@ public partial class PaletteWindow : Window
         Query.SelectAll();
     }
 
-    private void ShowConfirmDeleteStage(Guid desktopId)
+    /// <summary>
+    /// Deleting always relocates windows somewhere, so the destination is a choice rather
+    /// than something to be guessed at. Defaults to the first desktop, which is the usual
+    /// answer, and the list is filterable like any other.
+    /// </summary>
+    private void ShowDeleteStage(Guid desktopId)
     {
-        _stage = Stage.ConfirmDelete;
-        _subject = desktopId;
+        var others = _desktops.List().Where(d => d.Id != desktopId).ToList();
 
-        Query.Visibility = Visibility.Collapsed;
-
-        var fallback = _desktops.FallbackFor(desktopId);
-        var count = CountOn(desktopId);
-
-        if (fallback is null)
+        if (others.Count == 0)
         {
             _reportError("That is the only desktop, so it cannot be deleted.");
-            ShowDesktopStage(preserveQuery: true, select: desktopId);
             return;
         }
 
+        _stage = Stage.DeleteChooseTarget;
+        _subject = desktopId;
+
+        var count = CountOn(desktopId);
+
         HeaderText.Text = count == 0
-            ? $"Delete  “{NameOf(desktopId)}”?  It is empty."
-            : $"Delete  “{NameOf(desktopId)}”?  Its {count} window(s) will move to " +
-              $"“{fallback.DisplayName}”.";
+            ? $"Delete  “{NameOf(desktopId)}”  (empty).  Enter to confirm:"
+            : $"Delete  “{NameOf(desktopId)}”  and move its {count} window(s) to:";
 
-        // Show exactly which windows are affected. A confirmation that names the
-        // consequences is worth far more than one that just asks "are you sure".
+        FooterText.Text = "Enter  delete and move the windows there      " +
+                          "↑ ↓  choose      type to filter      Esc  cancel";
+
+        Query.Visibility = Visibility.Visible;
+
+        _suppressFilter = true;
+        Query.Text = "";
+        _suppressFilter = false;
+
+        ApplyDeleteTargetFilter("");
+
+        Query.Focus();
+        Keyboard.Focus(Query);
+    }
+
+    private void ApplyDeleteTargetFilter(string query)
+    {
+        query = query.Trim();
+
+        // Positional order, not recency: when choosing where windows should land, "which
+        // desktop is where" is the useful mental model, and it keeps the default stable.
+        var candidates = _desktops.List().Where(d => d.Id != _subject).ToList();
+
         var rows = new List<Row>();
-        var index = 0;
 
-        if (_windowsByDesktop.TryGetValue(desktopId, out var affected))
-            foreach (var hWnd in affected)
-                rows.Add(new Row
-                {
-                    Selectable = false,
-                    Index = index++,
-                    Display = "→  " + Trim(Native.GetWindowTitle(hWnd), 70),
-                    Badge = ""
-                });
+        foreach (var d in candidates)
+        {
+            if (query.Length > 0 && FuzzyScore(d.DisplayName, query) < 0)
+                continue;
 
-        if (rows.Count == 0)
-            rows.Add(new Row { Selectable = false, Display = "Nothing to move.", Badge = "" });
+            rows.Add(new Row
+            {
+                DesktopId = d.Id,
+                Index = d.Index,
+                Display = $"{d.Index + 1}.  {d.DisplayName}",
+                Count = CountOn(d.Id).ToString(),
+                Badge = d.Id == _currentDesktop ? "current" : ""
+            });
+        }
 
         Items.ItemsSource = rows;
-        Items.SelectedIndex = -1;
 
-        FooterText.Text = "Enter  delete it     Esc  cancel";
-
-        Items.Focus();
-        Keyboard.Focus(Items);
+        if (rows.Count > 0)
+            Items.SelectedIndex = 0;
     }
 
     // -----------------------------------------------------------------------
@@ -503,10 +452,19 @@ public partial class PaletteWindow : Window
 
     private void OnQueryChanged(object sender, TextChangedEventArgs e)
     {
-        if (_suppressFilter || _stage != Stage.Desktops)
+        if (_suppressFilter)
             return;
 
-        ApplyFilter(Query.Text);
+        switch (_stage)
+        {
+            case Stage.Desktops:
+                ApplyFilter(Query.Text);
+                break;
+
+            case Stage.DeleteChooseTarget:
+                ApplyDeleteTargetFilter(Query.Text);
+                break;
+        }
     }
 
     private void OnItemClick(object sender, MouseButtonEventArgs e)
@@ -514,11 +472,15 @@ public partial class PaletteWindow : Window
         if (FindAncestor<ListBoxItem>(e.OriginalSource as DependencyObject) is null)
             return;
 
-        if (Items.SelectedItem is Row { Selectable: false })
+        if (Items.SelectedItem is not Row { Selectable: true })
             return;
 
         e.Handled = true;
-        Confirm(invertFollow: (Keyboard.Modifiers & ModifierKeys.Control) != 0);
+
+        if (_stage == Stage.DeleteChooseTarget)
+            CommitDelete();
+        else if (_stage == Stage.Desktops)
+            Confirm(invertFollow: (Keyboard.Modifiers & ModifierKeys.Control) != 0);
     }
 
     private void OnKey(object? sender, KeyEventArgs e)
@@ -531,8 +493,8 @@ public partial class PaletteWindow : Window
         // never fires, which is exactly how Alt+Enter and Alt+Delete were both dead.
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
 
-        // Escape means "back one step", and only closes from the top level. That makes it
-        // safe to explore the deeper stages without losing your place.
+        // Escape means "back one step", and only closes from the desktop list. That makes
+        // renaming and deleting safe to back out of.
         if (key == Key.Escape)
         {
             e.Handled = true;
@@ -540,7 +502,7 @@ public partial class PaletteWindow : Window
             if (_stage == Stage.Desktops)
                 Cancel();
             else
-                ShowDesktopStage(preserveQuery: true, select: _subject);
+                ShowDesktopStage(preserveQuery: false, select: _subject);
 
             return;
         }
@@ -565,10 +527,6 @@ public partial class PaletteWindow : Window
                 OnDesktopKey(e, key, ctrl, alt);
                 break;
 
-            case Stage.Actions:
-                OnActionsKey(e, key);
-                break;
-
             case Stage.Rename:
                 if (key == Key.Enter)
                 {
@@ -577,7 +535,7 @@ public partial class PaletteWindow : Window
                 }
                 break;
 
-            case Stage.ConfirmDelete:
+            case Stage.DeleteChooseTarget:
                 if (key == Key.Enter)
                 {
                     e.Handled = true;
@@ -597,21 +555,9 @@ public partial class PaletteWindow : Window
                 e.Handled = true;
 
                 if (alt && selected?.DesktopId is { } goTo)
-                    RunAction(Act.SwitchTo, goTo);
+                    SwitchAndClose(goTo);
                 else
                     Confirm(invertFollow: ctrl);
-                break;
-
-            // Tab opens the discoverable list of everything else this row can do. This is
-            // what stops the extra verbs from being invisible keyboard trivia.
-            case Key.Tab when selected?.DesktopId is { } forActions:
-                e.Handled = true;
-                ShowActionsStage(forActions);
-                break;
-
-            case Key.Right when selected?.DesktopId is { } forActions2 && Query.CaretIndex == Query.Text.Length:
-                e.Handled = true;
-                ShowActionsStage(forActions2);
                 break;
 
             case Key.F2 when selected?.DesktopId is { } toRename:
@@ -621,7 +567,7 @@ public partial class PaletteWindow : Window
 
             case Key.Delete when alt && selected?.DesktopId is { } toDelete:
                 e.Handled = true;
-                ShowConfirmDeleteStage(toDelete);
+                ShowDeleteStage(toDelete);
                 break;
 
             case Key.Up when ctrl && selected?.DesktopId is { } up:
@@ -634,35 +580,6 @@ public partial class PaletteWindow : Window
                 Reorder(down, +1);
                 break;
         }
-    }
-
-    private void OnActionsKey(KeyEventArgs e, Key key)
-    {
-        // Single-letter accelerators, shown on each row so they are learned by using them.
-        var act = key switch
-        {
-            Key.Enter => (Items.SelectedItem as Row)?.Action,
-            Key.M => Act.MoveHere,
-            Key.K => Act.MoveHereAndStay,
-            Key.G => Act.SwitchTo,
-            Key.R or Key.F2 => Act.Rename,
-            Key.OemOpenBrackets => Act.MoveEarlier,
-            Key.OemCloseBrackets => Act.MoveLater,
-            Key.D or Key.Delete => Act.Delete,
-            _ => null
-        };
-
-        if (act is null)
-            return;
-
-        e.Handled = true;
-
-        // Moving the window is only offered when there is one to move.
-        if (act is Act.MoveHere or Act.MoveHereAndStay
-            && (_mode != Mode.MoveWindow || _captured == IntPtr.Zero))
-            return;
-
-        RunAction(act.Value, _subject);
     }
 
     private void MoveSelection(int delta)
@@ -708,59 +625,44 @@ public partial class PaletteWindow : Window
         if (row.DesktopId is not { } target)
             return;
 
-        var follow = _config.FollowWindowAfterMove ^ invertFollow;
-
         if (_mode == Mode.MoveWindow && _captured != IntPtr.Zero)
-            RunAction(follow ? Act.MoveHere : Act.MoveHereAndStay, target);
+            MoveAndClose(target, follow: _config.FollowWindowAfterMove ^ invertFollow);
         else
-            RunAction(Act.SwitchTo, target);
+            SwitchAndClose(target);
     }
 
-    private void RunAction(Act act, Guid desktopId)
+    /// <summary>
+    /// Hides and acts while this window still owns the foreground. Switching depends on
+    /// that: DesktopService.SwitchTo has to claim the foreground on the destination to stop
+    /// the previously focused window pulling us back, and Windows only honours that from
+    /// the process that currently has it. Closing first would surrender the right too soon.
+    /// </summary>
+    private void MoveAndClose(Guid target, bool follow)
     {
-        switch (act)
-        {
-            case Act.Rename:
-                ShowRenameStage(desktopId);
-                return;
-
-            case Act.Delete:
-                ShowConfirmDeleteStage(desktopId);
-                return;
-
-            case Act.MoveEarlier:
-                Reorder(desktopId, -1);
-                return;
-
-            case Act.MoveLater:
-                Reorder(desktopId, +1);
-                return;
-        }
-
-        // What remains moves the window or changes desktop, both of which finish the
-        // interaction. Hide and act while this window still owns the foreground: switching
-        // needs that right to stop the previously focused window pulling us back.
         _closing = true;
         Hide();
 
         try
         {
-            switch (act)
+            // Already there: moving would be a no-op, so honour the follow intent rather
+            // than reporting a success that changed nothing.
+            if (_capturedWindowDesktop == target)
             {
-                case Act.MoveHere:
-                case Act.MoveHereAndStay:
-                    MoveCaptured(desktopId, follow: act == Act.MoveHere);
-                    break;
+                if (follow && _currentDesktop != target
+                    && !_desktops.SwitchTo(target, out var goError))
+                    _reportError(goError ?? "Could not switch desktops.");
 
-                case Act.SwitchTo:
-                    if (!_desktops.SwitchTo(desktopId, out var switchError))
-                        _reportError(switchError ?? "Could not switch desktops.");
-                    break;
+                return;
             }
+
+            if (_desktops.MoveWindow(_captured, target, follow, out var moveError))
+                _state.RecordDestination(target, _config.RecentDestinationCount);
+            else
+                _reportError(moveError ?? "Could not move the window.");
         }
         catch (Exception ex)
         {
-            Log.Error($"unexpected failure running {act}", ex);
+            Log.Error("unexpected failure moving a window", ex);
             _reportError($"Something went wrong: {ex.Message}");
         }
         finally
@@ -769,23 +671,25 @@ public partial class PaletteWindow : Window
         }
     }
 
-    private void MoveCaptured(Guid target, bool follow)
+    private void SwitchAndClose(Guid target)
     {
-        // Already there: moving would be a no-op, so just honour the follow intent
-        // instead of reporting a success that changed nothing.
-        if (_capturedWindowDesktop == target)
+        _closing = true;
+        Hide();
+
+        try
         {
-            if (follow && _currentDesktop != target
-                && !_desktops.SwitchTo(target, out var goError))
-                _reportError(goError ?? "Could not switch desktops.");
-
-            return;
+            if (!_desktops.SwitchTo(target, out var error))
+                _reportError(error ?? "Could not switch desktops.");
         }
-
-        if (_desktops.MoveWindow(_captured, target, follow, out var moveError))
-            _state.RecordDestination(target, _config.RecentDestinationCount);
-        else
-            _reportError(moveError ?? "Could not move the window.");
+        catch (Exception ex)
+        {
+            Log.Error("unexpected failure switching desktops", ex);
+            _reportError($"Something went wrong: {ex.Message}");
+        }
+        finally
+        {
+            Close();
+        }
     }
 
     private void CreateAndUse(string name, bool invertFollow)
@@ -809,9 +713,7 @@ public partial class PaletteWindow : Window
             {
                 // A brand new desktop is empty, so following it is nearly always right.
                 // Ctrl still overrides for "park this somewhere and carry on".
-                var follow = !invertFollow;
-
-                if (_desktops.MoveWindow(_captured, created, follow, out var moveError))
+                if (_desktops.MoveWindow(_captured, created, !invertFollow, out var moveError))
                     _state.RecordDestination(created, _config.RecentDestinationCount);
                 else
                     _reportError(moveError ?? "Could not move the window.");
@@ -833,8 +735,8 @@ public partial class PaletteWindow : Window
     }
 
     /// <summary>
-    /// Reorder in place, staying open. The list rebuilds immediately with the moved
-    /// desktop still selected, so repeated presses walk it along visibly.
+    /// Reorder in place, staying open. The list rebuilds immediately with the moved desktop
+    /// still selected, so repeated presses walk it along visibly.
     /// </summary>
     private void Reorder(Guid desktopId, int delta)
     {
@@ -855,11 +757,7 @@ public partial class PaletteWindow : Window
         }
 
         LoadDesktops();
-
-        if (_stage == Stage.Actions)
-            ShowActionsStage(desktopId);
-        else
-            ShowDesktopStage(preserveQuery: true, select: desktopId);
+        ShowDesktopStage(preserveQuery: true, select: desktopId);
     }
 
     private void CommitRename()
@@ -885,17 +783,23 @@ public partial class PaletteWindow : Window
 
     private void CommitDelete()
     {
-        var deleted = _subject;
-        var name = NameOf(deleted);
-
-        if (!_desktops.DeleteDesktop(deleted, out var error))
+        if (Items.SelectedItem is not Row { DesktopId: { } fallback })
         {
-            _reportError(error ?? "Could not delete the desktop.");
-            ShowDesktopStage(preserveQuery: true, select: deleted);
+            _reportError("Choose a desktop for the windows to move to.");
             return;
         }
 
-        Log.Info($"deleted \"{name}\" from the palette");
+        var deleted = _subject;
+        var name = NameOf(deleted);
+
+        if (!_desktops.DeleteDesktop(deleted, fallback, out var error))
+        {
+            _reportError(error ?? "Could not delete the desktop.");
+            ShowDesktopStage(preserveQuery: false, select: deleted);
+            return;
+        }
+
+        Log.Info($"deleted \"{name}\" from the palette, windows moved to \"{NameOf(fallback)}\"");
 
         // Drop it from recents so a deleted desktop cannot sit at the top of the list.
         _state.RecentDestinations.Remove(deleted);
@@ -906,7 +810,7 @@ public partial class PaletteWindow : Window
         _state.Save();
 
         LoadDesktops();
-        ShowDesktopStage(preserveQuery: false);
+        ShowDesktopStage(preserveQuery: false, select: fallback);
     }
 
     private void SelectDesktop(Guid id)
@@ -939,15 +843,48 @@ public partial class PaletteWindow : Window
     }
 
     // -----------------------------------------------------------------------
-    // placement
+    // sizing and placement
     // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// Lets the list grow to show every desktop, capped only by what the monitor can
+    /// actually display. There is no reason to scroll a list that would fit.
+    /// </summary>
+    private void FitToMonitor()
+    {
+        var reference = _captured != IntPtr.Zero
+            ? _captured
+            : new System.Windows.Interop.WindowInteropHelper(this).Handle;
+
+        var screen = reference != IntPtr.Zero
+            ? System.Windows.Forms.Screen.FromHandle(reference)
+            : System.Windows.Forms.Screen.PrimaryScreen;
+
+        var area = screen?.WorkingArea ?? System.Windows.Forms.Screen.PrimaryScreen!.WorkingArea;
+
+        // Working area is in physical pixels; the list's MaxHeight is in WPF units. Ask the
+        // monitor for its scale rather than reading WPF's, which is only correct once the
+        // window is actually on that monitor.
+        var scale = Native.GetMonitorScale(reference);
+        var budget = area.Height / scale - 40;
+
+        // Whatever the window measures beyond the list is the fixed chrome: header, search
+        // box, footer, margins and the drop shadow's margin. Measuring it beats hardcoding.
+        Items.MaxHeight = double.PositiveInfinity;
+        UpdateLayout();
+
+        var chrome = Math.Max(ActualHeight - Items.ActualHeight, 0);
+
+        Items.MaxHeight = Math.Max(160, budget - chrome);
+        UpdateLayout();
+    }
 
     /// <summary>
     /// Centres the palette on the monitor holding <paramref name="reference"/>.
     ///
-    /// Done in physical pixels through SetWindowPos rather than WPF's Left/Top, because on
-    /// a mixed-DPI setup (laptop panel plus external monitor) WPF's device-independent
-    /// units are relative to a different monitor's scaling and the window lands somewhere
+    /// Done in physical pixels through SetWindowPos rather than WPF's Left/Top, because on a
+    /// mixed-DPI setup (laptop panel plus external monitor) WPF's device-independent units
+    /// are relative to a different monitor's scaling and the window lands somewhere
     /// unexpected.
     /// </summary>
     public void CentreOn(IntPtr reference)
@@ -965,8 +902,9 @@ public partial class PaletteWindow : Window
 
         var x = area.Left + (area.Width - rect.Width) / 2;
 
-        // Slightly above centre reads better than dead centre for a palette.
-        var y = area.Top + (int)((area.Height - rect.Height) * 0.32);
+        // Slightly above centre reads better than dead centre, but a tall list should not
+        // be pushed off the bottom of the screen.
+        var y = area.Top + (int)Math.Max((area.Height - rect.Height) * 0.32, 0);
 
         Native.SetWindowPos(handle, IntPtr.Zero, x, y, 0, 0,
             Native.SWP_NOSIZE | Native.SWP_NOZORDER | Native.SWP_NOACTIVATE);
@@ -976,6 +914,7 @@ public partial class PaletteWindow : Window
     public void ShowPalette()
     {
         Show();
+        FitToMonitor();
         CentreOn(_captured);
         Activate();
         Query.Focus();

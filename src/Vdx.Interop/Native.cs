@@ -42,6 +42,35 @@ public static class Native
     [DllImport("user32.dll")]
     public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
 
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromWindow(IntPtr hWnd, uint flags);
+
+    [DllImport("shcore.dll")]
+    private static extern int GetDpiForMonitor(IntPtr monitor, int type, out uint dpiX, out uint dpiY);
+
+    private const uint MONITOR_DEFAULTTONEAREST = 2;
+    private const int MDT_EFFECTIVE_DPI = 0;
+
+    /// <summary>
+    /// Scale factor of the monitor holding a window: 1.0 at 100%, 1.5 at 150%.
+    ///
+    /// Asked of the monitor directly rather than read off a WPF visual, because the caller
+    /// needs it for a monitor the window has not been moved to yet, and WPF's own DPI only
+    /// updates once the window is actually there and has pumped a message.
+    /// Falls back to 1.0 if the shell cannot answer.
+    /// </summary>
+    public static double GetMonitorScale(IntPtr hWnd)
+    {
+        var monitor = MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST);
+
+        if (monitor == IntPtr.Zero
+            || GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, out _, out var dpiY) != 0
+            || dpiY == 0)
+            return 1.0;
+
+        return dpiY / 96.0;
+    }
+
     [DllImport("user32.dll", SetLastError = true)]
     public static extern bool SetWindowPos(
         IntPtr hWnd, IntPtr insertAfter, int x, int y, int cx, int cy, uint flags);

@@ -67,6 +67,35 @@ function Get-VdxDesktopNames {
 
 function Get-VdxDesktopCount { (Get-VdxDesktopGuids | Measure-Object).Count }
 
+<#
+Desktop name -> list of window titles, via the spike's --list --windows. Used to assert
+where windows actually ended up, which the registry cannot tell us.
+#>
+function Get-VdxWindowMap([string]$RepoRoot) {
+    $dotnet = Join-Path $env:LOCALAPPDATA 'Microsoft\dotnet\dotnet.exe'
+    if (-not (Test-Path $dotnet)) { $dotnet = 'dotnet' }
+
+    $out = & $dotnet run --project (Join-Path $RepoRoot 'spike\Vdx.Spike') --no-build -- `
+        --list --windows 2>&1
+
+    $map = @{}
+    $current = $null
+
+    foreach ($line in $out) {
+        # "  3. AI CEO                     2 window(s)"
+        if ($line -match '^\s*\d+\.\s+(.+?)\s\s+(?:\d+ window\(s\)|empty)\s*$') {
+            $current = $Matches[1].Trim()
+            $map[$current] = @()
+        }
+        # "       - Character Map"
+        elseif ($current -and $line -match '^\s+-\s+(.+?)\s*$') {
+            $map[$current] += $Matches[1]
+        }
+    }
+
+    return $map
+}
+
 <# Zero-based position of a desktop by exact name, or -1. #>
 function Get-VdxDesktopPosition([string]$name) {
     $all = @(Get-VdxDesktopNames)

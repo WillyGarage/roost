@@ -81,8 +81,12 @@ public partial class HelpWindow : Window
         // ---- palette -------------------------------------------------------
         Heading("Inside the palette");
 
-        Note("One hotkey, everything from there. Each row shows how many windows are on " +
-             "that desktop, which is also how you spot the empty ones worth deleting.");
+        Note("One hotkey, everything from there. The list shows every desktop, capped only by " +
+             "what fits on screen, and the number on the right of each row is how many " +
+             "windows are on it. Zero means it is a candidate for deleting.");
+
+        Note("Every key below is also printed along the bottom of the palette itself, so " +
+             "there is nothing to look up while using it.");
 
         Row("type", "Filter desktops. Matches prefix, then substring, then loose letters in order");
         Row("↑ ↓", "Move the selection. PageUp and PageDown jump further");
@@ -90,8 +94,7 @@ public partial class HelpWindow : Window
         Row("Ctrl+Enter", $"Same, but inverts follow-or-stay for this one action " +
                           $"(default is {(_config.FollowWindowAfterMove ? "follow" : "stay")})");
         Row("Alt+Enter", "Just go to that desktop, moving nothing");
-        Row("Tab", "Show everything else this desktop can do. Start here if unsure");
-        Row("Esc", "Back one step, or cancel from the top and hand focus back");
+        Row("Esc", "Back one step, or cancel from the list and hand focus back");
 
         Note("Type a name that matches no existing desktop and the last row offers to create " +
              "it. Choosing that creates the desktop, names it, positions it, moves your " +
@@ -100,17 +103,17 @@ public partial class HelpWindow : Window
 
         Heading("Managing desktops");
 
-        Note("These work directly on the highlighted desktop, and are all listed under Tab " +
-             "so they never have to be remembered. The palette stays open afterwards so " +
+        Note("These act on the highlighted desktop. The palette stays open afterwards so " +
              "several can be done in one visit.");
 
         Row("F2", "Rename. The search box becomes the edit field, pre-filled");
         Row("Ctrl+↑  Ctrl+↓", "Move the desktop one position earlier or later, updating live");
-        Row("Alt+Delete", "Delete. Shows exactly which windows would be relocated, and where");
+        Row("Alt+Delete", "Delete. Asks where its windows should go first");
 
-        Note("Deleting never closes windows: they move to the neighbouring desktop, the same " +
-             "as Windows does for Win+Ctrl+F4. The confirmation names that destination and " +
-             "lists the windows affected before anything happens.");
+        Note("Deleting never closes windows. It asks which desktop they should move to, " +
+             "defaulting to the first one, and that list is filterable like any other. " +
+             "Empty desktops still ask, since Windows needs somewhere to send anything that " +
+             "appears in the meantime.");
 
         // ---- config --------------------------------------------------------
         Heading("Config reference");

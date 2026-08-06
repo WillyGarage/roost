@@ -106,8 +106,8 @@ public sealed class Config
         [
             "The main hotkey. Opens the palette with Enter set to move the active",
             "window. Everything else is reachable from there too: go to a desktop,",
-            "create, rename, reorder, delete. Press Tab on any desktop to see what",
-            "that row can do.",
+            "create, rename, reorder, delete. Every key is listed along the bottom",
+            "of the palette.",
             "Format: modifiers joined by '+' then a key, e.g. \"Win+Ctrl+H\".",
             "Modifiers: Win, Ctrl, Alt, Shift. At least one is required.",
             "Keys: any letter or digit, F1-F24, Space, Enter, Tab, arrows,",

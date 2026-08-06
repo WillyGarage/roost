@@ -396,10 +396,11 @@ public sealed class DesktopService : IDisposable
     }
 
     /// <summary>
-    /// Deletes a desktop. Any windows on it are relocated to the neighbouring desktop
-    /// rather than closed, matching what Windows itself does for Win+Ctrl+F4.
+    /// Deletes a desktop, relocating any windows on it to <paramref name="fallbackId"/>
+    /// rather than closing them. Pass null to let it pick the neighbouring desktop, which
+    /// is what Windows itself does for Win+Ctrl+F4.
     /// </summary>
-    public bool DeleteDesktop(Guid desktopId, out string? error)
+    public bool DeleteDesktop(Guid desktopId, Guid? fallbackId, out string? error)
     {
         error = null;
 
@@ -425,10 +426,18 @@ public sealed class DesktopService : IDisposable
             return false;
         }
 
-        // Windows land on the desktop to the left, or to the right when deleting the
-        // first one. Passing an explicit fallback means the destination is predictable
-        // rather than whatever the shell would have chosen.
-        var fallback = all[target.Index > 0 ? target.Index - 1 : 1];
+        // Caller's choice if given, otherwise the desktop to the left (or to the right when
+        // deleting the first one). Either way the fallback is explicit, so the destination
+        // is predictable rather than whatever the shell would have picked.
+        var fallback = fallbackId is { } chosen && all.Any(d => d.Id == chosen)
+            ? all.First(d => d.Id == chosen)
+            : all[target.Index > 0 ? target.Index - 1 : 1];
+
+        if (fallback.Id == desktopId)
+        {
+            error = "The windows cannot be moved to the desktop being deleted.";
+            return false;
+        }
 
         var op = _internal.TryRemoveDesktop(desktopId, fallback.Id);
 

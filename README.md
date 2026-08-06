@@ -95,7 +95,11 @@ Letters chosen for a **Dvorak** layout: `H` and `T` are the right hand's index a
 fingers on the home row. Virtual-key codes follow the active layout, so these move to the
 left hand if the layout changes to QWERTY.
 
-In the palette:
+The list shows every desktop, growing to whatever the monitor can display before it has to
+scroll. The number on the right of each row is the window count on that desktop; zero marks
+a candidate for deleting.
+
+Every key is printed along the bottom of the palette, so nothing has to be looked up:
 
 | Key | What it does |
 |---|---|
@@ -104,24 +108,14 @@ In the palette:
 | `Enter` | Move the active window there and follow it. A single click does the same |
 | `Ctrl+Enter` | Same, inverting follow-or-stay for this one action |
 | `Alt+Enter` | Just go to that desktop, moving nothing |
-| `Tab` | Show everything else this desktop can do |
-| `Esc` | Back one step, or cancel from the top and hand focus back |
-
-Each row shows how many windows are on that desktop, which is also how you spot the empty
-ones worth deleting.
-
-**Managing desktops**, all working on the highlighted row and all listed under `Tab` so
-nothing has to be memorised:
-
-| Key | What it does |
-|---|---|
 | `F2` | Rename. The search box becomes the edit field, pre-filled |
 | `Ctrl+↑` `Ctrl+↓` | Move the desktop one position earlier or later, updating live |
-| `Alt+Delete` | Delete. Shows exactly which windows would move, and where |
+| `Alt+Delete` | Delete, after asking where its windows should go |
+| `Esc` | Back one step, or cancel from the list and hand focus back |
 
-Deleting never closes windows: they move to the neighbouring desktop, the same as Windows
-does for `Win+Ctrl+F4`. The palette stays open after a rename, reorder or delete so several
-can be done in one visit.
+Deleting never closes windows. It asks which desktop they should move to, defaulting to the
+first one, and that list filters like any other. The palette stays open after a rename,
+reorder or delete so several can be done in one visit.
 
 Typing a name that matches no existing desktop offers to create it. Choosing that
 creates the desktop, names it, positions it directly after the one you are on, moves

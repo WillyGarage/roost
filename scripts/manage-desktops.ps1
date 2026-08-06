@@ -152,17 +152,26 @@ Check "moved one position later" ($after -eq $before + 1) "expected $($before + 
 Write-Host "  order: $((Get-VdxDesktopNames) -join ' | ')"
 
 # ---- delete ---------------------------------------------------------------
+# Alt+Delete now asks where the windows should go, so this also checks that the chosen
+# destination is honoured rather than a neighbour being assumed.
 Write-Host ""
-Write-Host "-- delete (Alt+Delete, then confirm) --"
+Write-Host "-- delete (Alt+Delete, choose destination, confirm) --"
+
+# Pick a destination that is deliberately NOT the neighbour, so a hardcoded fallback
+# would fail this test.
+$destination = @(Get-VdxDesktopNames) | Where-Object { $_ -ne $renamed } | Select-Object -Last 1
+Write-Host "  sending its windows to '$destination'"
 
 Chord $moveKey @($WIN, $CTRL)
 Start-Sleep -Milliseconds 1300
 Text $renamed
 Start-Sleep -Milliseconds 600
 Chord $DEL @($ALT)
-Start-Sleep -Milliseconds 1000      # confirmation stage, listing affected windows
+Start-Sleep -Milliseconds 1200      # destination chooser
+Text $destination                   # filter it down
+Start-Sleep -Milliseconds 700
 Key $RET
-Start-Sleep -Seconds 2
+Start-Sleep -Seconds 3
 
 $afterDelete = @(Get-VdxDesktopNames)
 Check "desktop is gone" (-not ($afterDelete -contains $renamed))
@@ -173,6 +182,11 @@ Check "original desktops all still present" (
 
 # Deleting must relocate windows, never close them.
 Check "scratch window survived the delete" (-not $scratch.HasExited)
+
+$map = Get-VdxWindowMap $root
+$landed = $map[$destination] | Where-Object { $_ -like '*Character Map*' }
+Check "windows landed on the chosen destination '$destination'" ([bool]$landed) `
+    "Character Map found on: $(($map.Keys | Where-Object { $map[$_] -like '*Character Map*' }) -join ', ')"
 
 if (-not $scratch.HasExited) { $scratch.Kill() }
 

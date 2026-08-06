@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Vdx"
-        Width="620"
+        Width="700"
         SizeToContent="Height"
         WindowStyle="None"
         AllowsTransparency="True"
@@ -23,7 +23,9 @@
         <SolidColorBrush x:Key="SelectionBrush" Color="#FF2C4F79"/>
 
         <Style x:Key="RowStyle" TargetType="ListBoxItem">
-            <Setter Property="Padding" Value="12,7"/>
+            <!-- Tight vertical padding on purpose: it buys roughly four more rows on a
+                 laptop panel before the list has to scroll. -->
+            <Setter Property="Padding" Value="12,5"/>
             <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -89,9 +91,10 @@
                      CaretBrush="{StaticResource AccentBrush}"
                      TextChanged="OnQueryChanged"/>
 
+            <!-- MaxHeight is set at runtime from the target monitor's working area, so the
+                 whole desktop list is shown unless it genuinely will not fit. -->
             <ListBox x:Name="Items"
                      Grid.Row="2"
-                     MaxHeight="380"
                      Margin="6,0,6,4"
                      Background="Transparent"
                      BorderThickness="0"
@@ -101,10 +104,14 @@
                      PreviewMouseLeftButtonUp="OnItemClick">
                 <ListBox.ItemTemplate>
                     <DataTemplate>
+                        <!-- Name takes the slack, status badges sit next to it, and the
+                             window count is a fixed-width column pinned to the right so
+                             the numbers line up down the list. -->
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="42"/>
                             </Grid.ColumnDefinitions>
 
                             <TextBlock Grid.Column="0"
@@ -118,17 +125,28 @@
                                        FontSize="11"
                                        VerticalAlignment="Center"
                                        Foreground="{StaticResource DimBrush}"/>
+
+                            <TextBlock Grid.Column="2"
+                                       Text="{Binding Count}"
+                                       Margin="10,0,0,0"
+                                       FontSize="13"
+                                       TextAlignment="Right"
+                                       VerticalAlignment="Center"
+                                       Foreground="{StaticResource DimBrush}"/>
                         </Grid>
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>
 
+            <!-- The full key list lives here. With no other discovery surface it has to be
+                 complete, so it wraps rather than truncating. -->
             <TextBlock x:Name="FooterText"
                        Grid.Row="3"
-                       Margin="12,2,12,8"
+                       Margin="12,4,12,8"
                        FontSize="11"
+                       LineHeight="17"
                        Foreground="{StaticResource DimBrush}"
-                       TextTrimming="CharacterEllipsis"/>
+                       TextWrapping="Wrap"/>
         </Grid>
     </Border>
 </Window>
