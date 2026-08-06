@@ -5,7 +5,6 @@ using Vdx.Interop;
 // Screen), so several type names exist in both. Alias the WPF ones explicitly rather
 // than fully qualifying every use site.
 using Application = System.Windows.Application;
-using MessageBox = System.Windows.MessageBox;
 
 namespace Vdx.App;
 
@@ -33,18 +32,24 @@ public partial class App : Application
         // Closing the palette must not exit the app; there is no main window.
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
+        // Logging comes first so a second instance losing the race is visible in the log.
+        // It used to be initialised after the check, which made that case leave no trace
+        // at all: the logon task appeared to start and stop for no reason.
+        Log.Init();
+
         _singleInstance = new Mutex(initiallyOwned: true, "Vdx.SingleInstance", out var isFirst);
+
         if (!isFirst)
         {
-            MessageBox.Show(
-                "Vdx is already running. Look for its icon in the notification area.",
-                "Vdx", MessageBoxButton.OK, MessageBoxImage.Information);
-
+            // Exit quietly. This deliberately does NOT show a dialog: the app is normally
+            // started by a logon scheduled task, and a modal message box there blocks the
+            // process indefinitely behind a window the user may never find, possibly on
+            // another virtual desktop. The already-running instance owns the tray icon and
+            // the hotkeys, so there is nothing useful for this one to say.
+            Log.Warn("another instance already holds the single-instance lock, exiting");
             Shutdown();
             return;
         }
-
-        Log.Init();
 
         DispatcherUnhandledException += (_, args) =>
         {
