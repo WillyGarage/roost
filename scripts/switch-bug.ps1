@@ -21,6 +21,8 @@ param(
     [string]$HomeDesktop = 'Comm'
 )
 
+. (Join-Path $PSScriptRoot 'common.ps1')
+
 $ErrorActionPreference = 'Stop'
 
 $root   = Split-Path -Parent $PSScriptRoot
@@ -170,9 +172,9 @@ Write-Host "starting Vdx"
 $vdx = Start-Process -FilePath $exe -PassThru
 Start-Sleep -Seconds 4
 
-$cfg   = Get-Content (Join-Path $env:APPDATA 'Vdx\config.json') -Raw | ConvertFrom-Json
+$cfg   = Get-VdxConfig
 $chord = $cfg.SwitchDesktopHotkey
-$key   = [byte][char]($chord.Split('+')[-1].ToUpper())
+$key   = Get-ChordKey $chord
 Write-Host "switch chord   : $chord"
 
 $kinds = if ($Scratch -eq 'both') { @('charmap', 'settings') } else { @($Scratch) }

@@ -127,13 +127,19 @@ public partial class App : Application
         switch (action)
         {
             case HotkeyAction.MoveWindow:
-                if (!IsMovable(captured, out var why))
+                // If there is nothing sensible to move (the desktop was focused, say),
+                // open the same palette in go-there mode rather than refusing with an
+                // error. The palette can do everything from there anyway, so a dead end
+                // would just be rude.
+                if (IsMovable(captured, out var why))
                 {
-                    _tray.ShowError(why!);
-                    return;
+                    OpenPalette(PaletteWindow.Mode.MoveWindow, captured);
                 }
-
-                OpenPalette(PaletteWindow.Mode.MoveWindow, captured);
+                else
+                {
+                    Log.Info($"nothing movable in the foreground ({why}), opening in go-there mode");
+                    OpenPalette(PaletteWindow.Mode.SwitchDesktop, captured);
+                }
                 break;
 
             case HotkeyAction.SwitchDesktop:
@@ -148,9 +154,12 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// Rejects the shell's own windows. Without this, pressing the hotkey with the
-    /// desktop or taskbar focused would try to move the shell, which either fails
-    /// confusingly or misbehaves.
+    /// Whether the foreground window is something worth trying to move. Rejects the
+    /// shell's own windows, since pressing the hotkey with the desktop or taskbar focused
+    /// would otherwise try to move the shell and either fail confusingly or misbehave.
+    ///
+    /// <paramref name="reason"/> is a sentence fragment describing what it is instead
+    /// ("the desktop itself"), for callers to compose into a message or a log line.
     /// </summary>
     private static bool IsMovable(IntPtr hWnd, out string? reason)
     {
@@ -158,13 +167,22 @@ public partial class App : Application
 
         if (hWnd == IntPtr.Zero)
         {
-            reason = "There is no active window to move.";
+            reason = "no active window";
             return false;
         }
 
         if (hWnd == Native.GetShellWindow())
         {
-            reason = "The desktop itself cannot be moved. Focus an application window first.";
+            reason = "the desktop itself";
+            return false;
+        }
+
+        // Our own windows: the help window in particular. Moving the palette's own app
+        // between desktops is never what anyone meant.
+        Native.GetWindowThreadProcessId(hWnd, out var owner);
+        if (owner == (uint)Environment.ProcessId)
+        {
+            reason = "one of Vdx's own windows";
             return false;
         }
 
@@ -181,7 +199,7 @@ public partial class App : Application
 
         if (shellClasses.Contains(cls, StringComparer.OrdinalIgnoreCase))
         {
-            reason = $"That is a Windows shell window ({cls}), not an application window.";
+            reason = $"a Windows shell window ({cls})";
             return false;
         }
 
@@ -210,7 +228,7 @@ public partial class App : Application
     {
         if (!IsMovable(captured, out var why))
         {
-            _tray!.ShowError(why!);
+            _tray!.ShowError($"Nothing to move: the active window is {why}.");
             return;
         }
 

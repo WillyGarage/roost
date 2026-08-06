@@ -278,6 +278,184 @@ public sealed class DesktopService : IDisposable
         return true;
     }
 
+    /// <summary>
+    /// Every user window grouped by the desktop it lives on.
+    ///
+    /// One enumeration plus one documented API call per window, so it is cheap enough to
+    /// run each time the palette opens rather than being cached and going stale. Desktops
+    /// with no windows are absent from the dictionary.
+    ///
+    /// The cloaking rule is the subtle part. Windows cloaks every window on a desktop
+    /// other than the current one, so cloaking cannot mean "ignore this". What it does
+    /// mean, when the window is on the CURRENT desktop, is that the window is a ghost:
+    /// a suspended UWP app or similar, which Task View and Alt-Tab both hide. Those are
+    /// the ones to drop.
+    /// </summary>
+    public Dictionary<Guid, List<IntPtr>> GroupWindowsByDesktop()
+    {
+        var grouped = new Dictionary<Guid, List<IntPtr>>();
+        var current = GetCurrentDesktopId();
+
+        foreach (var hWnd in Native.GetUserWindows())
+        {
+            if (!_documented.TryGetDesktopId(hWnd, out var id).Ok)
+                continue;
+
+            if (id == current && Native.IsCloaked(hWnd) != 0)
+                continue;
+
+            if (!grouped.TryGetValue(id, out var list))
+                grouped[id] = list = [];
+
+            list.Add(hWnd);
+        }
+
+        return grouped;
+    }
+
+    /// <summary>Window counts per desktop, derived from <see cref="GroupWindowsByDesktop"/>.</summary>
+    public Dictionary<Guid, int> CountWindowsByDesktop() =>
+        GroupWindowsByDesktop().ToDictionary(kv => kv.Key, kv => kv.Value.Count);
+
+    /// <summary>Renames a desktop, keeping Task View in sync.</summary>
+    public bool RenameDesktop(Guid desktopId, string name, out string? error)
+    {
+        error = null;
+
+        if (!CanMoveWindows)
+        {
+            error = Unavailable;
+            return false;
+        }
+
+        var op = _internal.TrySetName(desktopId, name);
+
+        if (op.Ok)
+        {
+            Log.Info($"renamed {desktopId:B} to \"{name}\"");
+
+            // Belt and braces: the shell call writes the registry itself, but if it ever
+            // stops doing so the name would silently revert on restart.
+            try
+            {
+                DesktopRegistry.SetName(desktopId, name);
+            }
+            catch (Exception ex)
+            {
+                Log.Warn($"shell rename succeeded but the registry write did not: {ex.Message}");
+            }
+
+            return true;
+        }
+
+        // Fall back to the registry, which is the tier that survives Windows updates.
+        Log.Warn($"shell rename failed ({op.Describe()}), trying the registry");
+
+        try
+        {
+            DesktopRegistry.SetName(desktopId, name);
+            Log.Info($"renamed {desktopId:B} to \"{name}\" via the registry");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            error = $"Could not rename the desktop: {ex.Message}";
+            Log.Error(error);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Moves a desktop to a new position. <paramref name="newIndex"/> is zero-based and
+    /// clamped, so callers can pass current+1 or current-1 without checking the ends.
+    /// </summary>
+    public bool ReorderDesktop(Guid desktopId, int newIndex, out string? error)
+    {
+        error = null;
+
+        if (!CanMoveWindows)
+        {
+            error = Unavailable;
+            return false;
+        }
+
+        var all = List();
+        var clamped = Math.Clamp(newIndex, 0, Math.Max(all.Count - 1, 0));
+
+        var op = _internal.TryReorderDesktop(desktopId, clamped);
+
+        if (op.Ok)
+        {
+            Log.Info($"moved desktop {desktopId:B} to position {clamped + 1}");
+            return true;
+        }
+
+        error = $"Could not reorder the desktop: {op.Describe()}";
+        Log.Error(error);
+        return false;
+    }
+
+    /// <summary>
+    /// Deletes a desktop. Any windows on it are relocated to the neighbouring desktop
+    /// rather than closed, matching what Windows itself does for Win+Ctrl+F4.
+    /// </summary>
+    public bool DeleteDesktop(Guid desktopId, out string? error)
+    {
+        error = null;
+
+        if (!CanMoveWindows)
+        {
+            error = Unavailable;
+            return false;
+        }
+
+        var all = List();
+
+        if (all.Count <= 1)
+        {
+            error = "This is the only desktop, so it cannot be deleted.";
+            return false;
+        }
+
+        var target = all.FirstOrDefault(d => d.Id == desktopId);
+
+        if (target is null)
+        {
+            error = "That desktop no longer exists.";
+            return false;
+        }
+
+        // Windows land on the desktop to the left, or to the right when deleting the
+        // first one. Passing an explicit fallback means the destination is predictable
+        // rather than whatever the shell would have chosen.
+        var fallback = all[target.Index > 0 ? target.Index - 1 : 1];
+
+        var op = _internal.TryRemoveDesktop(desktopId, fallback.Id);
+
+        if (op.Ok)
+        {
+            Log.Info($"deleted desktop \"{target.DisplayName}\", " +
+                     $"windows relocated to \"{fallback.DisplayName}\"");
+            return true;
+        }
+
+        error = $"Could not delete the desktop: {op.Describe()}";
+        Log.Error(error);
+        return false;
+    }
+
+    /// <summary>The desktop windows would land on if the given one were deleted.</summary>
+    public VirtualDesktopInfo? FallbackFor(Guid desktopId)
+    {
+        var all = List();
+        var target = all.FirstOrDefault(d => d.Id == desktopId);
+
+        if (target is null || all.Count <= 1)
+            return null;
+
+        return all[target.Index > 0 ? target.Index - 1 : 1];
+    }
+
     private static string Truncate(string s, int max = 40) =>
         string.IsNullOrEmpty(s) ? "(untitled window)"
         : s.Length <= max ? s

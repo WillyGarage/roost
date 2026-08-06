@@ -206,6 +206,27 @@ by default. `XButton1` is browser Back, and a low-level mouse hook would have to
 swallow it globally to claim it. The clean answer is to map a spare mouse button to one
 of these chords in the mouse's own vendor software.
 
+## Two traps worth remembering, 2026-08-05
+
+**DWM cloaking cannot be used as a "hide this window" filter.**
+Windows cloaks every window that sits on a virtual desktop other than the current one.
+That is how it hides them. So filtering out cloaked windows, which is the standard recipe
+for excluding suspended UWP ghosts from an Alt-Tab-style list, makes every other desktop
+look empty: the first window-count implementation reported 21 windows on the current
+desktop and 0 on the other 18.
+
+The usable rule is positional. A cloaked window on the **current** desktop is a ghost,
+because a real window there would be on screen. A cloaked window on any other desktop is
+just off-screen and should be counted. `DesktopService.GroupWindowsByDesktop` implements
+exactly that, and `Native.IsUserWindow` deliberately does not consider cloaking at all
+since it has no desktop context to judge it with.
+
+**WPF reports Alt+key as `Key.System`.**
+`e.Key` is `Key.System` for any Alt combination and the real key is in `e.SystemKey`.
+Matching on `e.Key` means every Alt binding silently never fires. `Alt+Enter` and
+`Alt+Delete` were both dead on arrival because of this, and the failure mode is a key that
+does nothing rather than an error. `PaletteWindow.OnKey` normalises this once, up front.
+
 ## Deferred / known limitations
 
 - **Elevation. UNVERIFIED.** The assumption is that moving a window owned by an elevated

@@ -104,7 +104,10 @@ public sealed class Config
     [
         ("MoveWindowHotkey", "Win+Ctrl+H",
         [
-            "Opens the palette to move the active window to another desktop.",
+            "The main hotkey. Opens the palette with Enter set to move the active",
+            "window. Everything else is reachable from there too: go to a desktop,",
+            "create, rename, reorder, delete. Press Tab on any desktop to see what",
+            "that row can do.",
             "Format: modifiers joined by '+' then a key, e.g. \"Win+Ctrl+H\".",
             "Modifiers: Win, Ctrl, Alt, Shift. At least one is required.",
             "Keys: any letter or digit, F1-F24, Space, Enter, Tab, arrows,",
@@ -117,9 +120,10 @@ public sealed class Config
 
         ("SwitchDesktopHotkey", "Win+Ctrl+T",
         [
-            "Opens the palette to switch desktops without moving any window.",
-            "A replacement for Win+Tab that does not need scrolling.",
-            "Same format as MoveWindowHotkey."
+            "Opens the SAME palette, but with Enter set to go to the desktop instead",
+            "of moving the window. Purely a convenience: Alt+Enter does this from the",
+            "main hotkey, and the palette is otherwise identical.",
+            "Set to \"\" if you would rather have a single entry point."
         ]),
 
         ("SendToLastCreatedHotkey", "\"\" (disabled)",

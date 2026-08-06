@@ -87,17 +87,41 @@ assumed, not verified. It costs nothing either way.
 
 ## Usage
 
-| Chord | What it does |
-|---|---|
-| `Win+Ctrl+H` | Palette: move the active window to a desktop |
-| `Win+Ctrl+T` | Palette: switch desktop, moving nothing |
+**`Win+Ctrl+H`** is the only hotkey you need. It opens the palette, and every desktop
+operation is reachable from there. `Win+Ctrl+T` opens the same palette with `Enter` set to
+go-there instead of move; it is a convenience, not a second UI, and can be unbound.
 
 Letters chosen for a **Dvorak** layout: `H` and `T` are the right hand's index and middle
 fingers on the home row. Virtual-key codes follow the active layout, so these move to the
 left hand if the layout changes to QWERTY.
 
-In the palette: type to filter, `Enter` or a single click to confirm, `Ctrl+Enter` to
-invert the follow-or-stay behaviour for one action, `Esc` to cancel and hand focus back.
+In the palette:
+
+| Key | What it does |
+|---|---|
+| type | Filter desktops. Prefix, then substring, then loose letters in order |
+| `↑` `↓` | Move the selection. PageUp/PageDown jump further |
+| `Enter` | Move the active window there and follow it. A single click does the same |
+| `Ctrl+Enter` | Same, inverting follow-or-stay for this one action |
+| `Alt+Enter` | Just go to that desktop, moving nothing |
+| `Tab` | Show everything else this desktop can do |
+| `Esc` | Back one step, or cancel from the top and hand focus back |
+
+Each row shows how many windows are on that desktop, which is also how you spot the empty
+ones worth deleting.
+
+**Managing desktops**, all working on the highlighted row and all listed under `Tab` so
+nothing has to be memorised:
+
+| Key | What it does |
+|---|---|
+| `F2` | Rename. The search box becomes the edit field, pre-filled |
+| `Ctrl+↑` `Ctrl+↓` | Move the desktop one position earlier or later, updating live |
+| `Alt+Delete` | Delete. Shows exactly which windows would move, and where |
+
+Deleting never closes windows: they move to the neighbouring desktop, the same as Windows
+does for `Win+Ctrl+F4`. The palette stays open after a rename, reorder or delete so several
+can be done in one visit.
 
 Typing a name that matches no existing desktop offers to create it. Choosing that
 creates the desktop, names it, positions it directly after the one you are on, moves
@@ -153,11 +177,27 @@ list in `src\Vdx.Interop\Com.cs` and check the vtable layout in `ComInternal.cs`
 a maintained reference. There is no fallback for moving windows: Windows ships no hotkey
 for it, so that capability is the one thing an update can genuinely take away.
 
-**Other useful spike modes.**
+**Other useful spike modes.** All read-only except `--delete`.
 
 ```powershell
-dotnet run --project spike\Vdx.Spike -- --current       # which desktop am I on
-dotnet run --project spike\Vdx.Spike -- --switch Comm   # switch, bypassing the app
+dotnet run --project spike\Vdx.Spike -- --list             # desktops with window counts
+dotnet run --project spike\Vdx.Spike -- --list --windows   # ...and the window titles
+dotnet run --project spike\Vdx.Spike -- --current          # which desktop am I on
+dotnet run --project spike\Vdx.Spike -- --switch Comm      # switch, bypassing the app
+dotnet run --project spike\Vdx.Spike -- --delete "Name"    # remove a stray desktop
+```
+
+`--list` is the one to reach for if the window counts in the palette ever look wrong; it
+computes them the same way and can print the titles behind each number.
+
+**Test scripts.** Each drives the real published exe with synthetic keystrokes and asserts
+against the registry, then puts the machine back as it found it.
+
+```powershell
+.\scripts\smoke-test.ps1 -Commit -TestCreate   # move, follow, create-name-position-move
+.\scripts\switch-bug.ps1                       # switching sticks, Win32 and UWP focused
+.\scripts\manage-desktops.ps1                  # create, rename, reorder, delete
+.\scripts\probe-hotkeys.ps1                    # which chords are free on this machine
 ```
 
 **Logs** are in `%LOCALAPPDATA%\Vdx\logs`, one file per day, pruned after 14 days.
@@ -165,13 +205,16 @@ Every failed operation records its HRESULT there.
 
 ## Status
 
-Working end to end on Windows 11 25H2 (26200.8875), verified by
-`scripts\smoke-test.ps1 -Commit -TestCreate` and `scripts\switch-bug.ps1`:
+Working end to end on Windows 11 25H2 (26200.8875), verified by the test scripts above:
 
 - move the active window to an existing desktop, and follow it there
 - create a desktop, name it, insert it after the current one, move the window onto it
-- switch desktops with no move
+- switch desktops with no move, and have it stick
+- rename, reorder and delete desktops from the palette
+- window counts per desktop
+- in-app help, and a config file that documents itself
 - errors surface as tray balloons and always land in the log
 
-Not yet built: mouse-button binding, marking several windows to move together, moving
-every window of one application. See the deferred list in docs/NOTES.md.
+Not yet built: find-a-window-across-all-desktops, mouse-button binding, marking several
+windows to move together, moving every window of one application. See the deferred list in
+docs/NOTES.md.

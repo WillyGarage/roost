@@ -19,6 +19,8 @@ param(
     [switch]$TestCreate
 )
 
+. (Join-Path $PSScriptRoot 'common.ps1')
+
 $ErrorActionPreference = 'Stop'
 
 $root = Split-Path -Parent $PSScriptRoot
@@ -58,28 +60,6 @@ function Send-Text([string]$text) {
     }
 }
 
-# Desktop list read the same way the app reads it: the ordered GUID blob, with names
-# joined from the per-desktop subkeys. Never enumerate the subkeys for the list itself,
-# because deleted desktops leave their name entries behind.
-$vdRoot = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VirtualDesktops'
-
-function Get-DesktopGuids {
-    $blob = (Get-ItemProperty $vdRoot -Name VirtualDesktopIDs).VirtualDesktopIDs
-    0..([int]($blob.Length / 16) - 1) | ForEach-Object {
-        [guid]::new([byte[]]($blob[($_ * 16)..($_ * 16 + 15)]))
-    }
-}
-
-function Get-DesktopCount { (Get-DesktopGuids | Measure-Object).Count }
-
-function Get-DesktopNames {
-    Get-DesktopGuids | ForEach-Object {
-        $key = Join-Path $vdRoot "Desktops\{$_}"
-        $n = (Get-ItemProperty $key -Name Name -ErrorAction SilentlyContinue).Name
-        if ($n) { $n } else { "(unnamed)" }
-    }
-}
-
 Get-Process -Name 'Vdx' -ErrorAction SilentlyContinue | ForEach-Object {
     Write-Host "stopping existing instance (pid $($_.Id))"
     $_.Kill(); $_.WaitForExit(3000) | Out-Null
@@ -103,9 +83,9 @@ Start-Sleep -Seconds 2
 
 # Read the chords from config rather than hardcoding them, so changing a default does
 # not silently turn this test into a no-op.
-$cfg      = Get-Content (Join-Path $env:APPDATA 'Vdx\config.json') -Raw | ConvertFrom-Json
-$moveKey  = [byte][char]($cfg.MoveWindowHotkey.Split('+')[-1].ToUpper())
-$switchKey = [byte][char]($cfg.SwitchDesktopHotkey.Split('+')[-1].ToUpper())
+$cfg       = Get-VdxConfig
+$moveKey   = Get-ChordKey $cfg.MoveWindowHotkey
+$switchKey = Get-ChordKey $cfg.SwitchDesktopHotkey
 
 Write-Host "$($cfg.MoveWindowHotkey)  move palette, then Escape"
 Send-WinCtrl $moveKey
@@ -120,7 +100,7 @@ Send-Key $ESC
 Start-Sleep -Milliseconds 700
 
 if ($cfg.SendToLastCreatedHotkey) {
-    $lastKey = [byte][char]($cfg.SendToLastCreatedHotkey.Split('+')[-1].ToUpper())
+    $lastKey = Get-ChordKey $cfg.SendToLastCreatedHotkey
     Write-Host "$($cfg.SendToLastCreatedHotkey)  send to last created"
     Send-WinCtrl $lastKey
     Start-Sleep -Milliseconds 1200
@@ -163,7 +143,7 @@ if ($TestCreate) {
     Write-Host ""
     Write-Host "-- create phase --"
 
-    $before = Get-DesktopCount
+    $before = Get-VdxDesktopCount
     Write-Host "desktops before: $before"
 
     if (-not $scratch.HasExited) {
@@ -185,13 +165,13 @@ if ($TestCreate) {
     Send-Key $RET
     Start-Sleep -Seconds 3
 
-    $after = Get-DesktopCount
+    $after = Get-VdxDesktopCount
     Write-Host "desktops after: $after"
 
     # Names come straight from the registry in display order, so printing the whole
     # order shows both that the name landed and that it was positioned correctly:
     # the new desktop should appear immediately after the one we started on.
-    Write-Host "order now: $((Get-DesktopNames) -join ' | ')"
+    Write-Host "order now: $((Get-VdxDesktopNames) -join ' | ')"
 
     # Clean up: we followed the window onto the new desktop, so Win+Ctrl+F4 closes that
     # one. Close the scratch window first, otherwise it gets relocated instead of closed.
@@ -201,7 +181,7 @@ if ($TestCreate) {
     Send-WinCtrl 0x73
     Start-Sleep -Seconds 2
 
-    $final = Get-DesktopCount
+    $final = Get-VdxDesktopCount
     Write-Host "desktops after cleanup: $final  (expected $before)"
 
     if ($final -ne $before) {

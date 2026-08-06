@@ -70,6 +70,89 @@ public static class Native
         return n > 0 ? sb.ToString() : string.Empty;
     }
 
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr GetWindowLongPtrW(IntPtr hWnd, int index);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr GetWindow(IntPtr hWnd, uint command);
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmGetWindowAttribute(IntPtr hWnd, int attribute, out int value, int size);
+
+    private const int GWL_EXSTYLE = -20;
+    private const long WS_EX_TOOLWINDOW = 0x00000080;
+    private const uint GW_OWNER = 4;
+
+    /// <summary>DWMWA_CLOAKED. Non-zero means the window is hidden by the shell.</summary>
+    private const int DWMWA_CLOAKED = 14;
+
+    /// <summary>
+    /// Structural test for "a window the user would recognise as theirs": visible, titled,
+    /// top-level, not a tool window, not owned by another window, not the shell.
+    ///
+    /// Deliberately does NOT consider DWM cloaking. Cloaking cannot be judged without
+    /// knowing which desktop the window is on, because Windows cloaks every window that
+    /// sits on a virtual desktop other than the current one. Filtering on cloaked alone
+    /// makes every other desktop look empty. See <see cref="IsCloaked"/>.
+    /// </summary>
+    public static bool IsUserWindow(IntPtr hWnd)
+    {
+        if (hWnd == IntPtr.Zero || hWnd == GetShellWindow())
+            return false;
+
+        if (!IsWindowVisible(hWnd))
+            return false;
+
+        if (GetWindowTitle(hWnd).Length == 0)
+            return false;
+
+        // Tool windows are palettes and helpers; they never appear in Alt-Tab.
+        var exStyle = GetWindowLongPtrW(hWnd, GWL_EXSTYLE).ToInt64();
+        if ((exStyle & WS_EX_TOOLWINDOW) != 0)
+            return false;
+
+        // Owned windows are dialogs and popups belonging to another window. Counting both
+        // would double-count one application window the user sees as one thing.
+        if (GetWindow(hWnd, GW_OWNER) != IntPtr.Zero)
+            return false;
+
+        return true;
+    }
+
+    /// <summary>
+    /// Whether DWM is hiding this window, and why (0 when it is not).
+    ///
+    /// The value is a bit field: 1 the app cloaked itself, 2 the shell cloaked it,
+    /// 4 inherited from an owner. The shell bit is doing double duty, which is the trap:
+    /// it means both "this window is on another virtual desktop" (a perfectly real window)
+    /// and "this is a suspended UWP app" (a ghost that should not be counted).
+    ///
+    /// The usable rule is therefore positional, not absolute: a window that is cloaked
+    /// while sitting on the CURRENT desktop is a ghost, because a real window there would
+    /// be on screen. A cloaked window on any other desktop is just off-screen.
+    ///
+    /// A failed DWM call reports 0, so an unexpected error cannot silently empty the list.
+    /// </summary>
+    public static int IsCloaked(IntPtr hWnd) =>
+        DwmGetWindowAttribute(hWnd, DWMWA_CLOAKED, out var cloaked, sizeof(int)) == 0 ? cloaked : 0;
+
+    /// <summary>
+    /// Top-level windows the user would recognise as theirs, front to back.
+    /// </summary>
+    public static List<IntPtr> GetUserWindows()
+    {
+        var result = new List<IntPtr>();
+
+        EnumWindows((hWnd, _) =>
+        {
+            if (IsUserWindow(hWnd))
+                result.Add(hWnd);
+            return true;
+        }, IntPtr.Zero);
+
+        return result;
+    }
+
     /// <summary>
     /// Visible top-level windows with a title, excluding the shell window itself.
     /// Deliberately not filtering further: callers decide what counts.

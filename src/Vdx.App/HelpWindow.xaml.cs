@@ -81,17 +81,36 @@ public partial class HelpWindow : Window
         // ---- palette -------------------------------------------------------
         Heading("Inside the palette");
 
+        Note("One hotkey, everything from there. Each row shows how many windows are on " +
+             "that desktop, which is also how you spot the empty ones worth deleting.");
+
         Row("type", "Filter desktops. Matches prefix, then substring, then loose letters in order");
         Row("↑ ↓", "Move the selection. PageUp and PageDown jump further");
-        Row("Enter", "Confirm. A single mouse click does the same");
-        Row("Ctrl+Enter", $"Confirm, inverting follow-or-stay for this one action " +
-                          $"(currently: {(_config.FollowWindowAfterMove ? "follow" : "stay")})");
-        Row("Esc", "Cancel and hand focus back to where you were");
+        Row("Enter", "Move the active window there and follow it. A single click does the same");
+        Row("Ctrl+Enter", $"Same, but inverts follow-or-stay for this one action " +
+                          $"(default is {(_config.FollowWindowAfterMove ? "follow" : "stay")})");
+        Row("Alt+Enter", "Just go to that desktop, moving nothing");
+        Row("Tab", "Show everything else this desktop can do. Start here if unsure");
+        Row("Esc", "Back one step, or cancel from the top and hand focus back");
 
         Note("Type a name that matches no existing desktop and the last row offers to create " +
              "it. Choosing that creates the desktop, names it, positions it, moves your " +
              "window onto it, and follows. With an empty search box the list starts with " +
              "your most recent destinations.");
+
+        Heading("Managing desktops");
+
+        Note("These work directly on the highlighted desktop, and are all listed under Tab " +
+             "so they never have to be remembered. The palette stays open afterwards so " +
+             "several can be done in one visit.");
+
+        Row("F2", "Rename. The search box becomes the edit field, pre-filled");
+        Row("Ctrl+↑  Ctrl+↓", "Move the desktop one position earlier or later, updating live");
+        Row("Alt+Delete", "Delete. Shows exactly which windows would be relocated, and where");
+
+        Note("Deleting never closes windows: they move to the neighbouring desktop, the same " +
+             "as Windows does for Win+Ctrl+F4. The confirmation names that destination and " +
+             "lists the windows affected before anything happens.");
 
         // ---- config --------------------------------------------------------
         Heading("Config reference");

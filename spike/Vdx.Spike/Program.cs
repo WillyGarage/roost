@@ -17,6 +17,106 @@ Console.OutputEncoding = System.Text.Encoding.UTF8;
 if (args.Contains("--internal"))
     return Vdx.Spike.InternalSpike.Run();
 
+// Delete a desktop by exact name. A repair tool for when a test or a crash leaves one
+// behind. Windows on it are relocated to a neighbour, never closed.
+if (args.Contains("--delete"))
+{
+    var wanted = args.SkipWhile(a => a != "--delete").Skip(1).FirstOrDefault();
+
+    if (string.IsNullOrWhiteSpace(wanted))
+    {
+        Console.WriteLine("usage: --delete \"<exact desktop name>\"");
+        return 1;
+    }
+
+    using var remover = new VirtualDesktopsInternal();
+    if (!remover.Available)
+    {
+        Console.WriteLine($"unavailable: {remover.UnavailableReason}");
+        return 1;
+    }
+
+    var candidates = DesktopRegistry.List();
+
+    // Exact match only. Deleting a desktop is destructive, so no fuzzy matching here,
+    // unlike --switch.
+    var doomed = candidates.FirstOrDefault(d =>
+        d.DisplayName.Equals(wanted, StringComparison.OrdinalIgnoreCase));
+
+    if (doomed is null)
+    {
+        Console.WriteLine($"no desktop named exactly \"{wanted}\"");
+        return 1;
+    }
+
+    if (candidates.Count <= 1)
+    {
+        Console.WriteLine("refusing to delete the only desktop");
+        return 1;
+    }
+
+    var fallback = candidates[doomed.Index > 0 ? doomed.Index - 1 : 1];
+    var removed = remover.TryRemoveDesktop(doomed.Id, fallback.Id);
+
+    Console.WriteLine(removed.Ok
+        ? $"deleted \"{doomed.DisplayName}\"; any windows moved to \"{fallback.DisplayName}\""
+        : $"failed: {removed.Describe()}");
+
+    return removed.Ok ? 0 : 1;
+}
+
+// Desktop list with window counts, the same way the palette computes them. Use this to
+// sanity-check the counts against what you can actually see on screen.
+if (args.Contains("--list"))
+{
+    using var reader = new VirtualDesktops();
+    using var shellForCurrent = new VirtualDesktopsInternal();
+    var all = DesktopRegistry.List();
+
+    Guid? currentId = shellForCurrent.Available
+                      && shellForCurrent.TryGetCurrentDesktop(out var cur).Ok
+        ? cur
+        : DesktopRegistry.GetCurrentHint();
+
+    var counts = new Dictionary<Guid, int>();
+    var titles = new Dictionary<Guid, List<string>>();
+
+    foreach (var hWnd in Native.GetUserWindows())
+    {
+        if (!reader.TryGetDesktopId(hWnd, out var owner).Ok)
+            continue;
+
+        // Same rule the app uses: cloaked is normal for windows on other desktops, but a
+        // cloaked window on the CURRENT desktop is a ghost (suspended UWP and friends).
+        if (owner == currentId && Native.IsCloaked(hWnd) != 0)
+            continue;
+
+        counts[owner] = counts.TryGetValue(owner, out var n) ? n + 1 : 1;
+
+        if (!titles.TryGetValue(owner, out var list))
+            titles[owner] = list = [];
+
+        list.Add(Native.GetWindowTitle(hWnd));
+    }
+
+    var verbose = args.Contains("--windows");
+
+    foreach (var d in all)
+    {
+        var count = counts.TryGetValue(d.Id, out var c) ? c : 0;
+        Console.WriteLine($"{d.Index + 1,3}. {d.DisplayName,-26} {(count == 0 ? "empty" : count + " window(s)")}");
+
+        if (verbose && titles.TryGetValue(d.Id, out var list))
+            foreach (var t in list)
+                Console.WriteLine($"       - {t}");
+    }
+
+    Console.WriteLine();
+    Console.WriteLine($"{all.Count} desktops, {counts.Values.Sum()} windows counted, " +
+                      $"{all.Count(d => !counts.ContainsKey(d.Id))} empty");
+    return 0;
+}
+
 // Put desktop names back from the app's backup after Windows loses them.
 // Dry run by default; add --apply to write.
 if (args.Contains("--restore-names"))
