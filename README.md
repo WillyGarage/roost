@@ -117,13 +117,15 @@ assumed, not verified. It costs nothing either way.
 
 ## Usage
 
-**`Win+Ctrl+H`** is the only hotkey you need. It opens the palette, and every desktop
-operation is reachable from there. `Win+Ctrl+T` opens the same palette with `Enter` set to
-go-there instead of move; it is a convenience, not a second UI, and can be unbound.
+**`Win+Ctrl+H`** is the only hotkey you need, and the only one bound by default. It opens
+the palette, and every desktop operation is reachable from there, including just switching
+with no move (`Enter`). `SwitchDesktopHotkey` can optionally be set to open the same palette
+without the move-related keys, since there is no captured window to move in that case; it's
+a leaner view, not a different action.
 
-Letters chosen for a **Dvorak** layout: `H` and `T` are the right hand's index and middle
-fingers on the home row. Virtual-key codes follow the active layout, so these move to the
-left hand if the layout changes to QWERTY.
+Letter chosen for a **Dvorak** layout: `H` is the right hand's index finger on the home row.
+Virtual-key codes follow the active layout, so this moves to the left hand if the layout
+changes to QWERTY.
 
 The list shows every desktop, growing to whatever the monitor can display before it has to
 scroll. The number on the right of each row is the window count on that desktop; zero marks
@@ -135,9 +137,9 @@ Every key is printed along the bottom of the palette, so nothing has to be looke
 |---|---|
 | type | Filter desktops. Prefix, then substring, then loose letters in order |
 | `↑` `↓` | Move the selection. PageUp/PageDown jump further |
-| `Enter` | Move the active window there and follow it. A single click does the same |
-| `Ctrl+Enter` | Same, inverting follow-or-stay for this one action |
-| `Alt+Enter` | Just go to that desktop, moving nothing |
+| `Enter` | Just go to that desktop, moving nothing. A single click does the same |
+| `Ctrl+Enter` | Move app there and stay |
+| `Alt+Enter` | Move app there and follow it |
 | `F2` | Rename. The search box becomes the edit field, pre-filled |
 | `Ctrl+↑` `Ctrl+↓` | Move the desktop one position earlier or later, updating live |
 | `Alt+Delete` | Delete, after asking where its windows should go |
@@ -147,10 +149,10 @@ Deleting never closes windows. It asks which desktop they should move to, defaul
 first one, and that list filters like any other. The palette stays open after a rename,
 reorder or delete so several can be done in one visit.
 
-Typing a name that matches no existing desktop offers to create it. Choosing that
-creates the desktop, names it, positions it directly after the one you are on, moves
-your window onto it, and follows. That is the whole "split this project out" flow in
-one gesture.
+Typing a name that matches no existing desktop offers to create it. Enter creates it and
+switches to it, moving nothing; Ctrl+Enter creates it and parks your window there;
+Alt+Enter creates it, moves your window onto it, and follows — the whole "split this
+project out" flow in one gesture.
 
 An empty search box lists recently used destinations first.
 

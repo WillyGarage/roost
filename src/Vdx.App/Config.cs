@@ -31,8 +31,8 @@ public sealed class Config
     /// <summary>Opens the palette to move the active window. Dvorak right index, home row.</summary>
     public string MoveWindowHotkey { get; set; } = "Win+Ctrl+H";
 
-    /// <summary>Opens the palette to switch desktops. Dvorak right middle, home row.</summary>
-    public string SwitchDesktopHotkey { get; set; } = "Win+Ctrl+T";
+    /// <summary>Opens the palette to switch desktops. Unbound by default: Win+Ctrl+H is the single entry point.</summary>
+    public string SwitchDesktopHotkey { get; set; } = "";
 
     /// <summary>
     /// Sends the active window straight to the most recently created desktop with no
@@ -49,8 +49,9 @@ public sealed class Config
     // ---- behaviour ---------------------------------------------------------
 
     /// <summary>
-    /// Switch to the destination after moving a window. Hold Ctrl when confirming to
-    /// invert this for a single action.
+    /// Switch to the destination after moving a window via SendToLastCreatedHotkey (the
+    /// no-palette action). Inside the palette this has no effect: Ctrl+Enter always stays
+    /// and Alt+Enter always follows.
     /// </summary>
     public bool FollowWindowAfterMove { get; set; } = true;
 
@@ -104,10 +105,10 @@ public sealed class Config
     [
         ("MoveWindowHotkey", "Win+Ctrl+H",
         [
-            "The main hotkey. Opens the palette with Enter set to move the active",
-            "window. Everything else is reachable from there too: go to a desktop,",
-            "create, rename, reorder, delete. Every key is listed along the bottom",
-            "of the palette.",
+            "The main hotkey. Opens the palette with the active window captured, so",
+            "Ctrl+Enter and Alt+Enter can move it. Everything else is reachable from",
+            "there too: go to a desktop, create, rename, reorder, delete. Every key",
+            "is listed along the bottom of the palette.",
             "Format: modifiers joined by '+' then a key, e.g. \"Win+Ctrl+H\".",
             "Modifiers: Win, Ctrl, Alt, Shift. At least one is required.",
             "Keys: any letter or digit, F1-F24, Space, Enter, Tab, arrows,",
@@ -118,12 +119,13 @@ public sealed class Config
             "scripts\\probe-hotkeys.ps1 to see what is actually free."
         ]),
 
-        ("SwitchDesktopHotkey", "Win+Ctrl+T",
+        ("SwitchDesktopHotkey", "\"\" (disabled)",
         [
-            "Opens the SAME palette, but with Enter set to go to the desktop instead",
-            "of moving the window. Purely a convenience: Alt+Enter does this from the",
-            "main hotkey, and the palette is otherwise identical.",
-            "Set to \"\" if you would rather have a single entry point."
+            "Opens the SAME palette, but without the move-related keys, since there is",
+            "never a captured window to move. Enter already goes to the desktop from",
+            "the main hotkey too, so this is a leaner view, not a different action.",
+            "Unbound by default: Win+Ctrl+H is the single entry point. Set a chord",
+            "here if you want a second, leaner-looking way in."
         ]),
 
         ("SendToLastCreatedHotkey", "\"\" (disabled)",
@@ -137,10 +139,12 @@ public sealed class Config
 
         ("FollowWindowAfterMove", "true",
         [
+            "Only affects SendToLastCreatedHotkey, which has no palette to give it a",
+            "modifier key.",
             "true  = after moving a window, switch to its destination.",
             "false = move it and stay where you are.",
-            "Either way, holding Ctrl when you confirm inverts this for that one",
-            "action, so both behaviours are always one keystroke away."
+            "Inside the palette this is fixed: Ctrl+Enter always stays and Alt+Enter",
+            "always follows, regardless of this setting."
         ]),
 
         ("InsertNewDesktopAfterCurrent", "true",

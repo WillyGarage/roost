@@ -35,12 +35,21 @@ Add-Type -Name Keys -Namespace Smoke -MemberDefinition @'
     public static extern void keybd_event(byte vk, byte scan, uint flags, System.UIntPtr extra);
 '@
 
-$WIN = 0x5B; $CTRL = 0x11; $ESC = 0x1B; $RET = 0x0D
+$WIN = 0x5B; $CTRL = 0x11; $ALT = 0x12; $ESC = 0x1B; $RET = 0x0D
 $UP  = 2
 
 function Send-Key([byte]$vk) {
     [Smoke.Keys]::keybd_event($vk, 0, 0,   [UIntPtr]::Zero)
     [Smoke.Keys]::keybd_event($vk, 0, $UP, [UIntPtr]::Zero)
+    Start-Sleep -Milliseconds 35
+}
+
+# Enter alone only switches desktops now; a real move needs Alt+Enter (move and follow).
+function Send-AltKey([byte]$vk) {
+    [Smoke.Keys]::keybd_event($ALT, 0, 0,   [UIntPtr]::Zero)
+    [Smoke.Keys]::keybd_event($vk,  0, 0,   [UIntPtr]::Zero)
+    [Smoke.Keys]::keybd_event($vk,  0, $UP, [UIntPtr]::Zero)
+    [Smoke.Keys]::keybd_event($ALT, 0, $UP, [UIntPtr]::Zero)
     Start-Sleep -Milliseconds 35
 }
 
@@ -132,7 +141,7 @@ if ($Commit) {
     Start-Sleep -Milliseconds 1200
     Send-Text $MoveTo
     Start-Sleep -Milliseconds 600
-    Send-Key $RET
+    Send-AltKey $RET
     Start-Sleep -Seconds 2
 
     Write-Host "switching back to a desktop matching '$ReturnTo'"
@@ -167,7 +176,7 @@ if ($TestCreate) {
     Start-Sleep -Milliseconds 1200
     Send-Text $name
     Start-Sleep -Milliseconds 600
-    Send-Key $RET
+    Send-AltKey $RET
     Start-Sleep -Seconds 3
 
     $after = Get-VdxDesktopCount

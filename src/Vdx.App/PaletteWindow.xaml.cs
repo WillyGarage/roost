@@ -22,10 +22,10 @@ public partial class PaletteWindow : Window
     /// <summary>What Enter does on a desktop row.</summary>
     public enum Mode
     {
-        /// <summary>Move the captured window there. The default.</summary>
+        /// <summary>Opened with a window captured, so Ctrl/Alt+Enter can move it too. Enter still just goes there.</summary>
         MoveWindow,
 
-        /// <summary>Just go there. Used when there is no movable window to act on.</summary>
+        /// <summary>Opened with nothing captured, so there is no window to move. Enter just goes there.</summary>
         SwitchDesktop
     }
 
@@ -200,8 +200,8 @@ public partial class PaletteWindow : Window
 
         HeaderText.Text = _mode switch
         {
-            Mode.MoveWindow when title.Length > 0 => $"Move  “{Trim(title, 70)}”  to:",
-            Mode.MoveWindow => "Move the active window to:",
+            Mode.MoveWindow when title.Length > 0 => $"Go, taking “{Trim(title, 70)}” along if you like:",
+            Mode.MoveWindow => "Go, taking the active app along if you like:",
             _ => "Go to desktop:"
         };
 
@@ -209,19 +209,12 @@ public partial class PaletteWindow : Window
         // it has to be complete rather than tidy.
         var keys = new List<string>();
 
+        keys.Add("Enter  go there");
+
         if (_mode == Mode.MoveWindow)
         {
-            keys.Add(_config.FollowWindowAfterMove
-                ? "Enter  move and follow"
-                : "Enter  move and stay");
-            keys.Add(_config.FollowWindowAfterMove
-                ? "Ctrl+Enter  move and stay"
-                : "Ctrl+Enter  move and follow");
-            keys.Add("Alt+Enter  go there");
-        }
-        else
-        {
-            keys.Add("Enter  go there");
+            keys.Add("Ctrl+Enter  move app and stay");
+            keys.Add("Alt+Enter  move app and follow");
         }
 
         keys.Add("F2  rename");
@@ -480,7 +473,11 @@ public partial class PaletteWindow : Window
         if (_stage == Stage.DeleteChooseTarget)
             CommitDelete();
         else if (_stage == Stage.Desktops)
-            Confirm(invertFollow: (Keyboard.Modifiers & ModifierKeys.Control) != 0);
+        {
+            var ctrl = (Keyboard.Modifiers & ModifierKeys.Control) != 0;
+            var alt = (Keyboard.Modifiers & ModifierKeys.Alt) != 0;
+            Confirm(alt ? ConfirmAction.MoveAndFollow : ctrl ? ConfirmAction.MoveAndStay : ConfirmAction.Go);
+        }
     }
 
     private void OnKey(object? sender, KeyEventArgs e)
@@ -553,11 +550,7 @@ public partial class PaletteWindow : Window
         {
             case Key.Enter:
                 e.Handled = true;
-
-                if (alt && selected?.DesktopId is { } goTo)
-                    SwitchAndClose(goTo);
-                else
-                    Confirm(invertFollow: ctrl);
+                Confirm(alt ? ConfirmAction.MoveAndFollow : ctrl ? ConfirmAction.MoveAndStay : ConfirmAction.Go);
                 break;
 
             case Key.F2 when selected?.DesktopId is { } toRename:
@@ -610,23 +603,37 @@ public partial class PaletteWindow : Window
     // actions
     // -----------------------------------------------------------------------
 
-    /// <summary>Enter on the desktop list: the primary action, or create-and-move.</summary>
-    private void Confirm(bool invertFollow)
+    /// <summary>What Enter/Ctrl+Enter/Alt+Enter does on the desktop list.</summary>
+    private enum ConfirmAction
+    {
+        /// <summary>Just go there, moving nothing. Enter.</summary>
+        Go,
+
+        /// <summary>Move the captured window there and stay put. Ctrl+Enter.</summary>
+        MoveAndStay,
+
+        /// <summary>Move the captured window there and follow it. Alt+Enter.</summary>
+        MoveAndFollow
+    }
+
+    /// <summary>Enter/Ctrl+Enter/Alt+Enter on the desktop list: go, move-and-stay, or
+    /// move-and-follow. Also handles create when the row is a new name.</summary>
+    private void Confirm(ConfirmAction action)
     {
         if (_closing || Items.SelectedItem is not Row row || !row.Selectable)
             return;
 
         if (row.NewName is not null)
         {
-            CreateAndUse(row.NewName, invertFollow);
+            CreateAndUse(row.NewName, action);
             return;
         }
 
         if (row.DesktopId is not { } target)
             return;
 
-        if (_mode == Mode.MoveWindow && _captured != IntPtr.Zero)
-            MoveAndClose(target, follow: _config.FollowWindowAfterMove ^ invertFollow);
+        if (_mode == Mode.MoveWindow && _captured != IntPtr.Zero && action != ConfirmAction.Go)
+            MoveAndClose(target, follow: action == ConfirmAction.MoveAndFollow);
         else
             SwitchAndClose(target);
     }
@@ -692,7 +699,7 @@ public partial class PaletteWindow : Window
         }
     }
 
-    private void CreateAndUse(string name, bool invertFollow)
+    private void CreateAndUse(string name, ConfirmAction action)
     {
         _closing = true;
         Hide();
@@ -709,11 +716,10 @@ public partial class PaletteWindow : Window
             _state.RecordCreated(created);
             _state.SnapshotNames(_desktops.List());
 
-            if (_mode == Mode.MoveWindow && _captured != IntPtr.Zero)
+            if (_mode == Mode.MoveWindow && _captured != IntPtr.Zero && action != ConfirmAction.Go)
             {
-                // A brand new desktop is empty, so following it is nearly always right.
-                // Ctrl still overrides for "park this somewhere and carry on".
-                if (_desktops.MoveWindow(_captured, created, !invertFollow, out var moveError))
+                if (_desktops.MoveWindow(
+                        _captured, created, action == ConfirmAction.MoveAndFollow, out var moveError))
                     _state.RecordDestination(created, _config.RecentDestinationCount);
                 else
                     _reportError(moveError ?? "Could not move the window.");

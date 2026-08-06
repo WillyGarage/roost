@@ -51,7 +51,7 @@ public partial class HelpWindow : Window
 
         if (!string.IsNullOrWhiteSpace(_config.MoveWindowHotkey))
         {
-            Row(_config.MoveWindowHotkey, "Open the palette and move the active window");
+            Row(_config.MoveWindowHotkey, "Open the palette with the active window, ready to move");
             anyHotkey = true;
         }
 
@@ -90,16 +90,16 @@ public partial class HelpWindow : Window
 
         Row("type", "Filter desktops. Matches prefix, then substring, then loose letters in order");
         Row("↑ ↓", "Move the selection. PageUp and PageDown jump further");
-        Row("Enter", "Move the active window there and follow it. A single click does the same");
-        Row("Ctrl+Enter", $"Same, but inverts follow-or-stay for this one action " +
-                          $"(default is {(_config.FollowWindowAfterMove ? "follow" : "stay")})");
-        Row("Alt+Enter", "Just go to that desktop, moving nothing");
+        Row("Enter", "Just go to that desktop, moving nothing. A single click does the same");
+        Row("Ctrl+Enter", "Move app there and stay");
+        Row("Alt+Enter", "Move app there and follow it");
         Row("Esc", "Back one step, or cancel from the list and hand focus back");
 
         Note("Type a name that matches no existing desktop and the last row offers to create " +
-             "it. Choosing that creates the desktop, names it, positions it, moves your " +
-             "window onto it, and follows. With an empty search box the list starts with " +
-             "your most recent destinations.");
+             "it. Enter creates it and switches to it, moving nothing; Ctrl+Enter creates it " +
+             "and parks your window there; Alt+Enter creates it, moves your window, and " +
+             "follows. With an empty search box the list starts with your most recent " +
+             "destinations.");
 
         Heading("Managing desktops");
 

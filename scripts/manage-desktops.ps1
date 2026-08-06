@@ -98,7 +98,7 @@ Chord $moveKey @($WIN, $CTRL)
 Start-Sleep -Milliseconds 1300
 Text $created
 Start-Sleep -Milliseconds 500
-Key $RET
+Chord $RET @($ALT)          # Alt+Enter: create, move the scratch window, and follow
 Start-Sleep -Seconds 3
 
 $afterCreate = @(Get-VdxDesktopNames)
