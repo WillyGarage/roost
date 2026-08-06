@@ -408,7 +408,7 @@ public partial class PaletteWindow : Window
 
     /// <summary>
     /// Prefix beats substring beats subsequence, with shorter names winning ties so "co"
-    /// prefers "Comm" over "Ground Model". Returns -1 for no match.
+    /// prefers "Code" over "Client Projects". Returns -1 for no match.
     /// </summary>
     private static int FuzzyScore(string text, string query)
     {

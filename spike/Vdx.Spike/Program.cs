@@ -122,7 +122,7 @@ if (args.Contains("--list"))
 if (args.Contains("--restore-names"))
     return Vdx.Spike.RestoreNames.Run(args);
 
-// Switch desktops programmatically: --switch "Comm" or --switch 3 (1-based position).
+// Switch desktops programmatically: --switch "Inbox" or --switch 3 (1-based position).
 // A repair tool, and how test scripts put the machine back where they found it without
 // depending on the app under test.
 if (args.Contains("--switch"))

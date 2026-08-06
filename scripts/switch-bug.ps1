@@ -17,8 +17,10 @@ param(
     [ValidateSet('charmap', 'settings', 'both')]
     [string]$Scratch = 'both',
 
-    [string]$Target = 'Thai',
-    [string]$HomeDesktop = 'Comm'
+    # Both default to whatever this machine has: home is the desktop you are on now, and
+    # the target is any other one. Hardcoding names would tie the test to one layout.
+    [string]$Target,
+    [string]$HomeDesktop
 )
 
 . (Join-Path $PSScriptRoot 'common.ps1')
@@ -176,6 +178,10 @@ $cfg   = Get-VdxConfig
 $chord = $cfg.SwitchDesktopHotkey
 $key   = Get-ChordKey $chord
 Write-Host "switch chord   : $chord"
+
+if (-not $HomeDesktop) { $HomeDesktop = Get-VdxCurrentDesktopName $root }
+if (-not $Target)      { $Target      = Get-VdxOtherDesktopName $HomeDesktop }
+Write-Host "home / target  : '$HomeDesktop' / '$Target'"
 
 $kinds = if ($Scratch -eq 'both') { @('charmap', 'settings') } else { @($Scratch) }
 foreach ($k in $kinds) { Test-Switch $k $key }

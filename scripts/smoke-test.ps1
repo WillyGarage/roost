@@ -8,12 +8,13 @@
 param(
     [switch]$Commit,
 
-    # Desktop to move the scratch window to during -Commit. Matched by the same fuzzy
-    # search the palette uses, so a prefix is enough.
-    [string]$MoveTo = 'GLP',
+    # Desktop to move the scratch window to during -Commit, matched by the same fuzzy
+    # search the palette uses. Defaults to any desktop other than the current one, so the
+    # test is not tied to one machine's layout.
+    [string]$MoveTo,
 
-    # Desktop to return to afterwards.
-    [string]$ReturnTo = 'Comm',
+    # Desktop to return to afterwards. Defaults to wherever you started.
+    [string]$ReturnTo,
 
     # Also exercise the create-name-position-move path, then delete the desktop it made.
     [switch]$TestCreate
@@ -86,6 +87,10 @@ Start-Sleep -Seconds 2
 $cfg       = Get-VdxConfig
 $moveKey   = Get-ChordKey $cfg.MoveWindowHotkey
 $switchKey = Get-ChordKey $cfg.SwitchDesktopHotkey
+
+if (-not $ReturnTo) { $ReturnTo = Get-VdxCurrentDesktopName $root }
+if (-not $MoveTo)   { $MoveTo   = Get-VdxOtherDesktopName $ReturnTo }
+Write-Host "move to / back to: '$MoveTo' / '$ReturnTo'"
 
 Write-Host "$($cfg.MoveWindowHotkey)  move palette, then Escape"
 Send-WinCtrl $moveKey

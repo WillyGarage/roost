@@ -5,6 +5,28 @@ desktop from a type-to-search palette, and creates + names new desktops on the f
 
 `Vdx` is a placeholder assembly prefix; renaming it later is a find/replace.
 
+## Requirements
+
+- Windows 11. Built and tested on 25H2 (build 26200); the 22H2/23H2 interface generation
+  is not currently in the candidate list, so older builds may need one added.
+- .NET 9 SDK, on Windows, to build. WPF cannot be built on Linux.
+- Nothing to install to run: the published exe is self-contained.
+
+## A caveat worth reading first
+
+Windows exposes **no supported API** for enumerating, creating, naming, switching or
+reordering virtual desktops. Only moving a window has a documented call, and that one
+refuses to touch windows owned by other processes, which is every window this tool exists
+to move.
+
+So the interesting half of this runs on undocumented COM interfaces whose identifiers
+change between Windows builds. That is a deliberate, understood dependency, not an
+oversight: it is the only way the feature exists at all. The design confines it, probes for
+interfaces instead of hardcoding build numbers, keeps a keystroke fallback wherever Windows
+provides one, and fails loudly at startup rather than silently mid-action. See
+[docs/NOTES.md](docs/NOTES.md) for the full stability analysis, the traps found along the
+way, and what to do when an update breaks something.
+
 ## Why this exists
 
 Splitting a pile of unrelated windows on Desktop 1 into per-project desktops currently
@@ -50,9 +72,17 @@ Recorded from the dev machine, 2026-08-05:
 | | |
 |---|---|
 | Windows | 11 25H2, build 26200.8875 |
-| Desktops in use | 14 |
+| Desktops in use | ~20 |
+| Keyboard layout | Dvorak (this drives the default hotkey letters) |
 | Displays | laptop + 1 external (virtual desktops switch both together) |
 | Also running | PowerToys FancyZones (orthogonal; moving a window between desktops preserves its zone) |
+
+The test scripts derive the desktop names they use at runtime, so they are not tied to this
+layout and will run anywhere with at least two desktops.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
 
 ## Install
 

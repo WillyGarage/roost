@@ -82,7 +82,7 @@ function Get-VdxWindowMap([string]$RepoRoot) {
     $current = $null
 
     foreach ($line in $out) {
-        # "  3. AI CEO                     2 window(s)"
+        # "  3. Some Desktop                2 window(s)"
         if ($line -match '^\s*\d+\.\s+(.+?)\s\s+(?:\d+ window\(s\)|empty)\s*$') {
             $current = $Matches[1].Trim()
             $map[$current] = @()
@@ -94,6 +94,37 @@ function Get-VdxWindowMap([string]$RepoRoot) {
     }
 
     return $map
+}
+
+<#
+Name of the desktop currently on screen, straight from the shell via the spike.
+
+Test scripts use this instead of a hardcoded desktop name so they run on any machine and
+leave it where they found it, whatever the local desktop layout happens to be.
+#>
+function Get-VdxCurrentDesktopName([string]$RepoRoot) {
+    $dotnet = Join-Path $env:LOCALAPPDATA 'Microsoft\dotnet\dotnet.exe'
+    if (-not (Test-Path $dotnet)) { $dotnet = 'dotnet' }
+
+    $out = (& $dotnet run --project (Join-Path $RepoRoot 'spike\Vdx.Spike') --no-build -- `
+        --current 2>&1) -join "`n"
+
+    # "  1. Some Desktop  {aacb37cc-...}"
+    if ($out -match '^\s*\d+\.\s+(.+?)\s\s+\{') { return $Matches[1].Trim() }
+
+    throw "could not determine the current desktop from: $out"
+}
+
+<#
+Name of some desktop that is not $Exclude. Used by tests that need a second desktop to
+move to without caring which one it is.
+#>
+function Get-VdxOtherDesktopName([string]$Exclude) {
+    $other = @(Get-VdxDesktopNames) | Where-Object { $_ -ne $Exclude } | Select-Object -First 1
+
+    if (-not $other) { throw "need at least two desktops; only found '$Exclude'" }
+
+    return $other
 }
 
 <# Zero-based position of a desktop by exact name, or -1. #>
