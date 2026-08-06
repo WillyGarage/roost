@@ -99,6 +99,53 @@ There is also a "send the active window to the last desktop you created" action.
 implemented but left unbound, because typing two or three characters into the palette
 turned out to be quick enough. Set `SendToLastCreatedHotkey` in the config to enable it.
 
+## Operations
+
+**Rebuilding after a code change.** `scripts\publish.ps1` stops any running instance
+first (a live process holds `dist\Vdx.exe` open and the publish would fail partway), and
+restarts the logon task afterwards if one is registered. So a rebuild is just:
+
+```powershell
+.\scripts\publish.ps1
+```
+
+Note the logon task points at `C:\dev\bill_virtual_desktops\dist\Vdx.exe`. Moving or
+deleting the repo breaks autostart; re-run `install-autostart.ps1` after relocating it.
+
+**If Windows loses your desktop names.** An Explorer crash or a major Windows update can
+wipe the names in HKCU, leaving a row of "Desktop 7". The app snapshots GUID-to-name into
+`%APPDATA%\Vdx\state.json` on every create and every palette open, so:
+
+```powershell
+dotnet run --project spike\Vdx.Spike -- --restore-names          # shows what it would do
+dotnet run --project spike\Vdx.Spike -- --restore-names --apply  # writes them back
+```
+
+It only touches desktops that still exist, so deleted ones are never resurrected.
+
+**If a Windows update breaks it.** The undocumented interface IDs change between builds.
+The app checks at startup and, if the check fails, shows a tray balloon and disables
+moving windows rather than failing silently per action. To diagnose:
+
+```powershell
+dotnet run --project spike\Vdx.Spike -- --internal
+```
+
+That reports which interface IDs this build accepts. Add the new one to the candidate
+list in `src\Vdx.Interop\Com.cs` and check the vtable layout in `ComInternal.cs` against
+a maintained reference. There is no fallback for moving windows: Windows ships no hotkey
+for it, so that capability is the one thing an update can genuinely take away.
+
+**Other useful spike modes.**
+
+```powershell
+dotnet run --project spike\Vdx.Spike -- --current       # which desktop am I on
+dotnet run --project spike\Vdx.Spike -- --switch Comm   # switch, bypassing the app
+```
+
+**Logs** are in `%LOCALAPPDATA%\Vdx\logs`, one file per day, pruned after 14 days.
+Every failed operation records its HRESULT there.
+
 ## Status
 
 Working end to end on Windows 11 25H2 (26200.8875), verified by

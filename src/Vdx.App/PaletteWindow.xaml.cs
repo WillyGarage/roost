@@ -384,6 +384,11 @@ public partial class PaletteWindow : Window
                 _state.RecordCreated(created);
                 target = created;
 
+                // Back the new name up immediately rather than waiting for the next time
+                // the palette opens. Otherwise a desktop created now and orphaned by an
+                // Explorer crash tonight would have no entry to restore from.
+                _state.SnapshotNames(_desktops.List());
+
                 // A brand new desktop is empty, so following it is almost always what
                 // you want even in switch mode.
                 follow = true;

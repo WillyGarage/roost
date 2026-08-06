@@ -208,10 +208,16 @@ of these chords in the mouse's own vendor software.
 
 ## Deferred / known limitations
 
-- **Elevation.** Moving a window owned by an elevated process requires this app to be
-  elevated too (UIPI blocks it otherwise). That rules out the `Run` registry key for
-  autostart, which would show a UAC prompt every logon. Use a Scheduled Task set to
-  run at logon with highest privileges.
+- **Elevation. UNVERIFIED.** The assumption is that moving a window owned by an elevated
+  process requires this app to be elevated too, since UIPI blocks a lower-integrity
+  process from affecting a higher one. It is a reasonable assumption but it has **not been
+  tested**, and the move goes through a COM call into Explorer rather than a direct
+  window-message, so it may well work unelevated. Test it by running something elevated
+  (an admin terminal), focusing it, pressing the move hotkey, and checking the log for
+  `E_ACCESSDENIED`. Autostart runs elevated anyway, so this costs nothing either way,
+  but the claim should not be repeated as fact until someone checks.
+  Note this does rule out the `Run` registry key for autostart, which would show a UAC
+  prompt every logon; hence the Scheduled Task with highest privileges.
 - **Logging is not optional.** An elevated resident app has no console to watch, so
   file logging goes in from day one.
 - **Pinned windows.** A window set to "show on all desktops" silently ignores a move.

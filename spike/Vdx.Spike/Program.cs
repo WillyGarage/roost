@@ -17,6 +17,11 @@ Console.OutputEncoding = System.Text.Encoding.UTF8;
 if (args.Contains("--internal"))
     return Vdx.Spike.InternalSpike.Run();
 
+// Put desktop names back from the app's backup after Windows loses them.
+// Dry run by default; add --apply to write.
+if (args.Contains("--restore-names"))
+    return Vdx.Spike.RestoreNames.Run(args);
+
 // Switch desktops programmatically: --switch "Comm" or --switch 3 (1-based position).
 // A repair tool, and how test scripts put the machine back where they found it without
 // depending on the app under test.
