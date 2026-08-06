@@ -19,6 +19,7 @@ public sealed class TrayHost : IDisposable
 
     public event Action? ReloadRequested;
     public event Action? ExitRequested;
+    public event Action? HelpRequested;
 
     public TrayHost(Config config, string statusLine)
     {
@@ -40,6 +41,15 @@ public sealed class TrayHost : IDisposable
         menu.Items.Add(header);
         menu.Items.Add(new ToolStripSeparator());
 
+        // Help first: it is the entry that explains all the others, including the config
+        // settings, so it should be the obvious thing to click when you do not know what
+        // you are looking for.
+        var help = new ToolStripMenuItem("Help and settings reference", null,
+            (_, _) => HelpRequested?.Invoke());
+        help.Font = new Font(help.Font, System.Drawing.FontStyle.Bold);
+        menu.Items.Add(help);
+
+        menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Open config file", null, (_, _) => OpenInShell(Config.FilePath));
         menu.Items.Add("Open log folder", null, (_, _) => OpenInShell(Log.Directory));
         menu.Items.Add("Reload config", null, (_, _) => ReloadRequested?.Invoke());
@@ -47,6 +57,10 @@ public sealed class TrayHost : IDisposable
         menu.Items.Add("Exit", null, (_, _) => ExitRequested?.Invoke());
 
         _icon.ContextMenuStrip = menu;
+
+        // Double-clicking a tray icon should do the most obvious thing, and for an app
+        // whose whole UI is a hotkey palette, that is "explain yourself".
+        _icon.DoubleClick += (_, _) => HelpRequested?.Invoke();
 
         Log.Info("tray icon created");
     }

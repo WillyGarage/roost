@@ -24,6 +24,7 @@ public partial class App : Application
     private TrayHost? _tray;
     private HotkeyService? _hotkeys;
     private PaletteWindow? _palette;
+    private HelpWindow? _help;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -70,6 +71,7 @@ public partial class App : Application
         _tray = new TrayHost(_config, status);
         _tray.ExitRequested += () => Shutdown();
         _tray.ReloadRequested += Reload;
+        _tray.HelpRequested += ShowHelp;
 
         if (!_desktops.CanMoveWindows)
             _tray.ShowError(
@@ -240,6 +242,24 @@ public partial class App : Application
     // -----------------------------------------------------------------------
     // lifecycle
     // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// Opens the help window, or brings the existing one forward. Built fresh each time so
+    /// it reflects the current config after a reload.
+    /// </summary>
+    private void ShowHelp()
+    {
+        if (_help is not null)
+        {
+            _help.Activate();
+            return;
+        }
+
+        _help = new HelpWindow(_config, _desktops!);
+        _help.Closed += (_, _) => _help = null;
+        _help.Show();
+        _help.Activate();
+    }
 
     private void Reload()
     {
