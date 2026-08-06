@@ -148,15 +148,64 @@ public sealed class DesktopService : IDisposable
         }
 
         var op = _internal.TrySwitchTo(desktopId);
-        if (op.Ok)
+        if (!op.Ok)
         {
-            Log.Info($"switched to {desktopId:B}");
-            return true;
+            error = $"Could not switch desktops: {op.Describe()}";
+            Log.Error(error);
+            return false;
         }
 
-        error = $"Could not switch desktops: {op.Describe()}";
-        Log.Error(error);
-        return false;
+        Log.Info($"switched to {desktopId:B}");
+
+        // Claim the foreground on the destination, or the switch can be silently undone.
+        //
+        // SwitchDesktop leaves the previously focused window still holding the
+        // foreground, even though it lives on the desktop we just left. Well-behaved
+        // Win32 windows sit there quietly, but a UWP window (hosted by
+        // ApplicationFrameHost) asynchronously re-activates itself a moment later, and
+        // activating a window on another desktop makes Windows switch back to it. The
+        // result was a switch that appeared to do nothing whenever the active window was
+        // something like Settings, while working fine from Notepad.
+        //
+        // Activating a window that is already on the destination moves the foreground off
+        // the stale window, so the late re-activation becomes a foreground steal by a
+        // background app, which Windows refuses.
+        var landing = TopWindowOn(desktopId);
+
+        if (landing != IntPtr.Zero)
+        {
+            VirtualDesktops.ActivateWindow(landing);
+            Log.Info($"focused \"{Truncate(Native.GetWindowTitle(landing))}\" on the destination");
+        }
+        else
+        {
+            // An empty desktop has nothing to focus. Nothing is holding the foreground
+            // that we care about either, so there is nothing to defend against.
+            Log.Info("destination has no window to focus");
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// The frontmost ordinary window on a given desktop, or zero if it has none.
+    /// EnumWindows walks top-level windows in Z-order, front to back, so the first match
+    /// is the one the user would consider "on top".
+    /// </summary>
+    private IntPtr TopWindowOn(Guid desktopId)
+    {
+        var shell = Native.GetShellWindow();
+
+        foreach (var hWnd in Native.GetTopLevelWindows())
+        {
+            if (hWnd == shell)
+                continue;
+
+            if (_documented.TryGetDesktopId(hWnd, out var id).Ok && id == desktopId)
+                return hWnd;
+        }
+
+        return IntPtr.Zero;
     }
 
     /// <summary>

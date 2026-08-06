@@ -101,21 +101,32 @@ Write-Host "opening a scratch Character Map window"
 $scratch = Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\charmap.exe') -PassThru
 Start-Sleep -Seconds 2
 
-Write-Host "Win+Ctrl+K  move palette, then Escape"
-Send-WinCtrl 0x4B
+# Read the chords from config rather than hardcoding them, so changing a default does
+# not silently turn this test into a no-op.
+$cfg      = Get-Content (Join-Path $env:APPDATA 'Vdx\config.json') -Raw | ConvertFrom-Json
+$moveKey  = [byte][char]($cfg.MoveWindowHotkey.Split('+')[-1].ToUpper())
+$switchKey = [byte][char]($cfg.SwitchDesktopHotkey.Split('+')[-1].ToUpper())
+
+Write-Host "$($cfg.MoveWindowHotkey)  move palette, then Escape"
+Send-WinCtrl $moveKey
 Start-Sleep -Milliseconds 1400
 Send-Key $ESC
 Start-Sleep -Milliseconds 700
 
-Write-Host "Win+Ctrl+J  switch palette, then Escape"
-Send-WinCtrl 0x4A
+Write-Host "$($cfg.SwitchDesktopHotkey)  switch palette, then Escape"
+Send-WinCtrl $switchKey
 Start-Sleep -Milliseconds 1400
 Send-Key $ESC
 Start-Sleep -Milliseconds 700
 
-Write-Host "Win+Ctrl+U  send to last created (expected to report none yet)"
-Send-WinCtrl 0x55
-Start-Sleep -Milliseconds 1200
+if ($cfg.SendToLastCreatedHotkey) {
+    $lastKey = [byte][char]($cfg.SendToLastCreatedHotkey.Split('+')[-1].ToUpper())
+    Write-Host "$($cfg.SendToLastCreatedHotkey)  send to last created"
+    Send-WinCtrl $lastKey
+    Start-Sleep -Milliseconds 1200
+} else {
+    Write-Host "send-to-last-created is unbound, skipping"
+}
 
 if ($Commit) {
     Write-Host ""
@@ -132,7 +143,7 @@ if ($Commit) {
         Start-Sleep -Milliseconds 600
     }
 
-    Send-WinCtrl 0x4B
+    Send-WinCtrl $moveKey
     Start-Sleep -Milliseconds 1200
     Send-Text $MoveTo
     Start-Sleep -Milliseconds 600
@@ -140,7 +151,7 @@ if ($Commit) {
     Start-Sleep -Seconds 2
 
     Write-Host "switching back to a desktop matching '$ReturnTo'"
-    Send-WinCtrl 0x4A
+    Send-WinCtrl $switchKey
     Start-Sleep -Milliseconds 1200
     Send-Text $ReturnTo
     Start-Sleep -Milliseconds 600
@@ -167,7 +178,7 @@ if ($TestCreate) {
     $name = 'Vdx Smoke Test'
     Write-Host "creating desktop '$name' and moving the scratch window onto it"
 
-    Send-WinCtrl 0x4B
+    Send-WinCtrl $moveKey
     Start-Sleep -Milliseconds 1200
     Send-Text $name
     Start-Sleep -Milliseconds 600

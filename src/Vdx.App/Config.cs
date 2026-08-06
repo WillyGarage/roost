@@ -16,22 +16,34 @@ public sealed class Config
     //
     // Defaults sit in the Win+Ctrl family because that is already Windows' own
     // virtual-desktop modifier prefix (Win+Ctrl+D, Win+Ctrl+F4, Win+Ctrl+arrows).
-    // The obvious Win+Ctrl+M is NOT used: Windows reserves it for Magnifier settings,
-    // and Win+Ctrl+L is taken too. Run scripts\probe-hotkeys.ps1 to see what is free
-    // on a given machine rather than guessing.
+    //
+    // The letters are chosen for a DVORAK layout: H and T are the right hand's index and
+    // middle fingers on the home row. Note that virtual-key codes follow the active
+    // keyboard layout, so "H" here means the key that types h in Dvorak, which is the
+    // physical QWERTY-J position. On a QWERTY layout these would land under the left
+    // hand instead, so change them if the layout changes.
+    //
+    // The obvious Win+Ctrl+M is NOT used: Windows reserves it for Magnifier settings.
+    // Also taken on this machine: Win+Ctrl+N/S/D/C/L/F/V. Run
+    // scripts\probe-hotkeys.ps1 to check a machine rather than guessing.
 
-    /// <summary>Opens the palette to move the active window.</summary>
-    public string MoveWindowHotkey { get; set; } = "Win+Ctrl+K";
+    /// <summary>Opens the palette to move the active window. Dvorak right index, home row.</summary>
+    public string MoveWindowHotkey { get; set; } = "Win+Ctrl+H";
 
-    /// <summary>Opens the palette to switch desktops without moving anything.</summary>
-    public string SwitchDesktopHotkey { get; set; } = "Win+Ctrl+J";
+    /// <summary>Opens the palette to switch desktops. Dvorak right middle, home row.</summary>
+    public string SwitchDesktopHotkey { get; set; } = "Win+Ctrl+T";
 
     /// <summary>
     /// Sends the active window straight to the most recently created desktop with no
-    /// palette. This is the "I just made a project desktop, now send five more windows
-    /// there" shortcut.
+    /// palette.
+    ///
+    /// Unbound by default: it turned out not to be needed in practice, since typing two
+    /// or three characters into the palette is already fast enough. The implementation is
+    /// kept because it costs nothing to keep and the wiring is done; set a chord here to
+    /// turn it back on. Available right-hand Dvorak options include Win+Ctrl+G and
+    /// Win+Ctrl+R.
     /// </summary>
-    public string SendToLastCreatedHotkey { get; set; } = "Win+Ctrl+U";
+    public string SendToLastCreatedHotkey { get; set; } = "";
 
     // ---- behaviour ---------------------------------------------------------
 

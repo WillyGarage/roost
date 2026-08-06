@@ -17,6 +17,74 @@ Console.OutputEncoding = System.Text.Encoding.UTF8;
 if (args.Contains("--internal"))
     return Vdx.Spike.InternalSpike.Run();
 
+// Switch desktops programmatically: --switch "Comm" or --switch 3 (1-based position).
+// A repair tool, and how test scripts put the machine back where they found it without
+// depending on the app under test.
+if (args.Contains("--switch"))
+{
+    var wanted = args.SkipWhile(a => a != "--switch").Skip(1).FirstOrDefault();
+
+    if (string.IsNullOrWhiteSpace(wanted))
+    {
+        Console.WriteLine("usage: --switch <desktop name or 1-based position>");
+        return 1;
+    }
+
+    using var switcher = new VirtualDesktopsInternal();
+    if (!switcher.Available)
+    {
+        Console.WriteLine($"unavailable: {switcher.UnavailableReason}");
+        return 1;
+    }
+
+    var all = DesktopRegistry.List();
+
+    var match = int.TryParse(wanted, out var position)
+        ? all.FirstOrDefault(d => d.Index == position - 1)
+        : all.FirstOrDefault(d =>
+              d.DisplayName.Equals(wanted, StringComparison.OrdinalIgnoreCase))
+          ?? all.FirstOrDefault(d =>
+              d.DisplayName.Contains(wanted, StringComparison.OrdinalIgnoreCase));
+
+    if (match is null)
+    {
+        Console.WriteLine($"no desktop matching \"{wanted}\"");
+        return 1;
+    }
+
+    var switched = switcher.TrySwitchTo(match.Id);
+    Console.WriteLine(switched.Ok
+        ? $"switched to {match.Index + 1}. {match.DisplayName}"
+        : $"failed: {switched.Describe()}");
+
+    return switched.Ok ? 0 : 1;
+}
+
+// Authoritative "which desktop am I on", straight from the shell rather than the
+// lazily-written registry hint. Used by switch-bug.ps1 to check whether a switch stuck.
+if (args.Contains("--current"))
+{
+    using var probe = new VirtualDesktopsInternal();
+
+    if (!probe.Available)
+    {
+        Console.WriteLine($"unavailable: {probe.UnavailableReason}");
+        return 1;
+    }
+
+    var op = probe.TryGetCurrentDesktop(out var currentId);
+    if (!op.Ok)
+    {
+        Console.WriteLine($"failed: {op.Describe()}");
+        return 1;
+    }
+
+    var found = DesktopRegistry.List().FirstOrDefault(d => d.Id == currentId);
+    Console.WriteLine($"{(found is null ? "?" : (found.Index + 1).ToString())}. " +
+                      $"{found?.DisplayName ?? "unknown"}  {currentId:B}");
+    return 0;
+}
+
 const string TestDesktopName = "Vdx spike (delete me)";
 
 var log = new List<string>();

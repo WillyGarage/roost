@@ -98,7 +98,7 @@
                      Foreground="{StaticResource TextBrush}"
                      ItemContainerStyle="{StaticResource RowStyle}"
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                     MouseDoubleClick="OnItemDoubleClick">
+                     PreviewMouseLeftButtonUp="OnItemClick">
                 <ListBox.ItemTemplate>
                     <DataTemplate>
                         <Grid>

@@ -75,6 +75,36 @@ already does this correctly.
 **`CurrentVirtualDesktop` registry hint was accurate** at the time of the run, but it
 is still only a hint; the documented `GetWindowDesktopId` path remains the plan.
 
+**2026-08-05 — a successful `SwitchDesktop` can be silently undone.**
+Symptom: picking a desktop in the switch palette appeared to do nothing, even though the
+log showed `SwitchDesktop` returning S_OK.
+
+Cause: `SwitchDesktop` changes the visible desktop but leaves the previously focused
+window still holding the **foreground**, even though that window now lives on the desktop
+we just left. A well-behaved Win32 window sits there quietly and the switch holds. A UWP
+window, hosted by `ApplicationFrameHost`, asynchronously re-activates itself a moment
+later, and activating a window on another desktop makes Windows switch back to it. So the
+bug only reproduced when the active window was something like Settings, and never from
+Notepad or Character Map. That intermittency is what made it look like the switch call
+itself was failing.
+
+Fix: after a successful switch, `SetForegroundWindow` the frontmost window already on the
+destination desktop. That moves the foreground off the stale window, so its late
+re-activation becomes a foreground steal by a background app, which Windows refuses.
+
+Two consequences worth remembering:
+
+- The palette must still own the foreground when this runs, because Windows only honours
+  `SetForegroundWindow` from the process that currently has it. So the palette hides and
+  acts, then closes; it must not close first.
+- Move-and-follow never showed the bug because by the time anything re-activated the
+  captured window, that window was already on the destination, so the re-activation
+  pulled the desktop the right way.
+
+`scripts\switch-bug.ps1` is the regression test. It runs the same flow twice, once with a
+plain Win32 window focused and once with a UWP window, because only the second one
+catches this.
+
 ## Spike results — all questions closed, 2026-08-05
 
 Run `dotnet run --project spike\Vdx.Spike` for the read-only + keystroke round, and
@@ -142,18 +172,30 @@ names come from the registry, which needs no COM.
 ## Hotkey availability, 2026-08-05
 
 `Win+Ctrl+M` from the original spec **cannot be used**: Windows reserves it for
-Magnifier settings, and `RegisterHotKey` returns error 1409. `Win+Ctrl+L`,
-`Win+Ctrl+O`, `Win+Ctrl+Space`, `Win+Ctrl+Enter`, `Win+Alt+M`, `Win+Alt+K`,
-`Win+Alt+Space`, `Win+Shift+M` and `Ctrl+Alt+K` are also taken on this machine.
+Magnifier settings, and `RegisterHotKey` returns error 1409. Also taken on this machine:
+`Win+Ctrl+N/S/D/C/L/F/V/O`, `Win+Ctrl+Space`, `Win+Ctrl+Enter`, `Win+Alt+M`,
+`Win+Alt+K`, `Win+Alt+Space`, `Win+Shift+M`, `Ctrl+Alt+K`.
 
-Defaults chosen from what actually probed free, staying inside the `Win+Ctrl` family
-because that is already Windows' own virtual-desktop modifier prefix:
+Free in the `Win+Ctrl` family: `H T G R B W Z` (plus `J K U Y I`, which are left-hand
+on Dvorak).
 
-| Chord | Action |
-|---|---|
-| `Win+Ctrl+K` | palette: move the active window |
-| `Win+Ctrl+J` | palette: switch desktop, no move |
-| `Win+Ctrl+U` | send active window to the last desktop created |
+Current defaults. The machine uses a **Dvorak** layout, so the letters are chosen for
+where they land on Dvorak, not QWERTY. `H` and `T` are the right hand's index and middle
+fingers on the home row. Staying inside `Win+Ctrl` keeps them in Windows' own
+virtual-desktop modifier family (`Win+Ctrl+D`, `Win+Ctrl+F4`, `Win+Ctrl+arrows`).
+
+| Chord | Dvorak position | Action |
+|---|---|---|
+| `Win+Ctrl+H` | right index, home row | palette: move the active window |
+| `Win+Ctrl+T` | right middle, home row | palette: switch desktop, no move |
+| *(unbound)* | | send active window to the last desktop created |
+
+**Virtual-key codes follow the active keyboard layout.** `"H"` in the config means the
+key that types `h` under the current layout, which on Dvorak is the physical QWERTY-J
+position. Switching the layout to QWERTY would move these chords to the left hand.
+
+Send-to-last-created is implemented but unbound: in practice typing two or three
+characters into the palette is already fast enough. Set a chord to re-enable.
 
 Run `scripts\probe-hotkeys.ps1` to re-check on any machine. Do not guess.
 

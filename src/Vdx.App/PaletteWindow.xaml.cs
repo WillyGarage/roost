@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Threading;
 using Vdx.Interop;
 
 // WinForms is enabled in this project for the tray icon, so disambiguate the WPF types
@@ -254,8 +255,28 @@ public partial class PaletteWindow : Window
     private void OnQueryChanged(object sender, System.Windows.Controls.TextChangedEventArgs e) =>
         ApplyFilter(Query.Text);
 
-    private void OnItemDoubleClick(object sender, MouseButtonEventArgs e) =>
-        Commit(invertFollow: false);
+    /// <summary>
+    /// A single click commits, which is what anyone who has used a menu expects. The
+    /// earlier double-click-only behaviour read as "I picked one and nothing happened".
+    /// </summary>
+    private void OnItemClick(object sender, MouseButtonEventArgs e)
+    {
+        // Selection already happened on mouse-down, so SelectedItem is the clicked row.
+        // Hit-test anyway so a click on the list's padding or scrollbar does nothing.
+        if (FindAncestor<System.Windows.Controls.ListBoxItem>(e.OriginalSource as DependencyObject) is null)
+            return;
+
+        e.Handled = true;
+        Commit(invertFollow: (Keyboard.Modifiers & ModifierKeys.Control) != 0);
+    }
+
+    private static T? FindAncestor<T>(DependencyObject? from) where T : DependencyObject
+    {
+        while (from is not null and not T)
+            from = System.Windows.Media.VisualTreeHelper.GetParent(from);
+
+        return from as T;
+    }
 
     private void OnKey(object? sender, KeyEventArgs e)
     {
@@ -330,10 +351,22 @@ public partial class PaletteWindow : Window
             return;
 
         _closing = true;
-        Hide();
 
         var follow = _config.FollowWindowAfterMove ^ invertFollow;
 
+        // Hide rather than Close, and act while this window still holds the foreground.
+        //
+        // That matters: DesktopService.SwitchTo has to call SetForegroundWindow on the
+        // destination desktop to stop the previously focused window dragging us back, and
+        // Windows only honours that from a process that currently owns the foreground.
+        // Closing first would surrender that right before we need it.
+        Hide();
+
+        Perform(row, follow);
+    }
+
+    private void Perform(Row row, bool follow)
+    {
         try
         {
             var target = row.DesktopId;
@@ -345,8 +378,7 @@ public partial class PaletteWindow : Window
                         out var created, out var createError))
                 {
                     _reportError(createError ?? "Could not create the desktop.");
-                    Close();
-                    return;
+                    return; // finally still closes the window
                 }
 
                 _state.RecordCreated(created);
@@ -383,6 +415,7 @@ public partial class PaletteWindow : Window
             Log.Error("unexpected failure committing palette action", ex);
             _reportError($"Something went wrong: {ex.Message}");
         }
+
         finally
         {
             Close();

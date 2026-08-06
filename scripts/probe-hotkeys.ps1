@@ -6,6 +6,11 @@
 # only authoritative answer.
 #
 # Stop Vdx before running this, or the chords it already holds will report as taken.
+#
+# Pass -Chords to test a specific set, e.g.
+#   .\probe-hotkeys.ps1 -Chords 'Win+Ctrl+H','Win+Ctrl+T'
+
+param([string[]]$Chords)
 
 $ErrorActionPreference = 'Stop'
 
@@ -28,6 +33,13 @@ $candidates = @(
     'Ctrl+Alt+M', 'Ctrl+Alt+K', 'Ctrl+Alt+L', 'Ctrl+Alt+J', 'Ctrl+Alt+Space',
     'Ctrl+Shift+Alt+M', 'Ctrl+Shift+Alt+K', 'Ctrl+Shift+Alt+L'
 )
+
+if ($Chords) {
+    # Invoked with -File, PowerShell hands array arguments over as one comma-joined
+    # string, so split defensively rather than silently probing a nonsense chord.
+    $candidates = $Chords | ForEach-Object { $_ -split ',' } | Where-Object { $_.Trim() } |
+        ForEach-Object { $_.Trim() }
+}
 
 function Get-Vk([string]$key) {
     switch ($key.ToLower()) {

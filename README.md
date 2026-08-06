@@ -72,12 +72,15 @@ owned by an elevated process requires this app to be elevated too. A manually la
 
 | Chord | What it does |
 |---|---|
-| `Win+Ctrl+K` | Palette: move the active window to a desktop |
-| `Win+Ctrl+J` | Palette: switch desktop, moving nothing |
-| `Win+Ctrl+U` | Send the active window to the last desktop you created |
+| `Win+Ctrl+H` | Palette: move the active window to a desktop |
+| `Win+Ctrl+T` | Palette: switch desktop, moving nothing |
 
-In the palette: type to filter, `Enter` to confirm, `Ctrl+Enter` to invert the
-follow-or-stay behaviour for one action, `Esc` to cancel and hand focus back.
+Letters chosen for a **Dvorak** layout: `H` and `T` are the right hand's index and middle
+fingers on the home row. Virtual-key codes follow the active layout, so these move to the
+left hand if the layout changes to QWERTY.
+
+In the palette: type to filter, `Enter` or a single click to confirm, `Ctrl+Enter` to
+invert the follow-or-stay behaviour for one action, `Esc` to cancel and hand focus back.
 
 Typing a name that matches no existing desktop offers to create it. Choosing that
 creates the desktop, names it, positions it directly after the one you are on, moves
@@ -90,12 +93,16 @@ Right-click the tray icon for the hotkey list, the config file, and the log fold
 
 Defaults live in `%APPDATA%\Vdx\config.json` and are re-read by "Reload config" in the
 tray menu. `Win+Ctrl+M` from the original brief is **not** used because Windows reserves
-it; run `scripts\probe-hotkeys.ps1` before choosing replacements.
+it for Magnifier settings; run `scripts\probe-hotkeys.ps1` before choosing replacements.
+
+There is also a "send the active window to the last desktop you created" action. It is
+implemented but left unbound, because typing two or three characters into the palette
+turned out to be quick enough. Set `SendToLastCreatedHotkey` in the config to enable it.
 
 ## Status
 
 Working end to end on Windows 11 25H2 (26200.8875), verified by
-`scripts\smoke-test.ps1 -Commit -TestCreate`:
+`scripts\smoke-test.ps1 -Commit -TestCreate` and `scripts\switch-bug.ps1`:
 
 - move the active window to an existing desktop, and follow it there
 - create a desktop, name it, insert it after the current one, move the window onto it
