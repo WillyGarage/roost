@@ -3,7 +3,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
 
-namespace Vdx.App;
+namespace Roost.App;
 
 /// <summary>
 /// Tray icon and its menu. WinForms NotifyIcon because WPF has no tray support.
@@ -30,7 +30,7 @@ public sealed class TrayHost : IDisposable
         {
             Icon = _generated,
             Visible = true,
-            Text = Trim($"Vdx — {statusLine}")
+            Text = Trim($"Roost — {statusLine}")
         };
 
         var menu = new ContextMenuStrip();
@@ -95,7 +95,7 @@ public sealed class TrayHost : IDisposable
 
         try
         {
-            _icon.ShowBalloonTip(6000, "Vdx", message, ToolTipIcon.Warning);
+            _icon.ShowBalloonTip(6000, "Roost", message, ToolTipIcon.Warning);
         }
         catch (Exception ex)
         {
@@ -103,7 +103,7 @@ public sealed class TrayHost : IDisposable
         }
     }
 
-    public void SetStatus(string statusLine) => _icon.Text = Trim($"Vdx — {statusLine}");
+    public void SetStatus(string statusLine) => _icon.Text = Trim($"Roost — {statusLine}");
 
     /// <summary>NotifyIcon.Text throws above 63 characters.</summary>
     private static string Trim(string s) => s.Length <= 63 ? s : s[..62] + "…";

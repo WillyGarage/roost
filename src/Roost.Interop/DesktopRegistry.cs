@@ -1,6 +1,6 @@
 using Microsoft.Win32;
 
-namespace Vdx.Interop;
+namespace Roost.Interop;
 
 /// <summary>
 /// Enumerates and names virtual desktops by reading the registry directly.

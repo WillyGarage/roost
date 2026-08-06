@@ -1,7 +1,7 @@
 using System.Diagnostics;
-using Vdx.Interop;
+using Roost.Interop;
 
-// Vdx.Spike: capability report for the current Windows build.
+// Roost.Spike: capability report for the current Windows build.
 //
 // Kept in the repo permanently. When a Windows update breaks something, this is the
 // first thing to run: it reports what works on this machine without involving the
@@ -15,7 +15,7 @@ Console.OutputEncoding = System.Text.Encoding.UTF8;
 
 // Round 2 lives in its own file and exercises the undocumented interfaces.
 if (args.Contains("--internal"))
-    return Vdx.Spike.InternalSpike.Run();
+    return Roost.Spike.InternalSpike.Run();
 
 // Delete a desktop by exact name. A repair tool for when a test or a crash leaves one
 // behind. Windows on it are relocated to a neighbour, never closed.
@@ -120,7 +120,7 @@ if (args.Contains("--list"))
 // Put desktop names back from the app's backup after Windows loses them.
 // Dry run by default; add --apply to write.
 if (args.Contains("--restore-names"))
-    return Vdx.Spike.RestoreNames.Run(args);
+    return Roost.Spike.RestoreNames.Run(args);
 
 // Switch desktops programmatically: --switch "Inbox" or --switch 3 (1-based position).
 // A repair tool, and how test scripts put the machine back where they found it without
@@ -190,7 +190,7 @@ if (args.Contains("--current"))
     return 0;
 }
 
-const string TestDesktopName = "Vdx spike (delete me)";
+const string TestDesktopName = "Roost spike (delete me)";
 
 var log = new List<string>();
 void Section(string s) { Console.WriteLine(); Console.WriteLine(s); Console.Out.Flush(); }

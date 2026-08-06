@@ -1,7 +1,7 @@
 using System.Diagnostics;
-using Vdx.Interop;
+using Roost.Interop;
 
-namespace Vdx.Spike;
+namespace Roost.Spike;
 
 /// <summary>
 /// Round 2: exercises the undocumented interfaces, which is the only route to moving
@@ -14,7 +14,7 @@ namespace Vdx.Spike;
 /// </summary>
 internal static class InternalSpike
 {
-    private const string TestDesktopName = "Vdx round2 (delete me)";
+    private const string TestDesktopName = "Roost round2 (delete me)";
 
     public static int Run()
     {

@@ -56,13 +56,13 @@ Consequences:
 `[ComImport]` interface declarations for these interfaces are **vtable-order
 dependent**. A missing or misordered method does not throw; it silently calls the
 wrong slot, giving wrong behavior or a hard crash. Every declaration must be
-transcribed carefully against known-good sources, and `Vdx.Spike` exists to
+transcribed carefully against known-good sources, and `Roost.Spike` exists to
 smoke-test each method individually rather than discovering breakage inside the app.
 
 ## Findings
 
 **2026-08-05 — registry tier confirmed working on 26200.8875.**
-`Vdx.Spike` enumerates all 13 desktops in correct display order with names, using
+`Roost.Spike` enumerates all 13 desktops in correct display order with names, using
 registry reads only. No COM, not elevated. So the palette's list, ordering, names, and
 unnamed-fallback labels are all on the stable tier as designed.
 
@@ -107,7 +107,7 @@ catches this.
 
 ## Spike results — all questions closed, 2026-08-05
 
-Run `dotnet run --project spike\Vdx.Spike` for the read-only + keystroke round, and
+Run `dotnet run --project spike\Roost.Spike` for the read-only + keystroke round, and
 `-- --internal` for the undocumented-interface round.
 
 **Q1 — documented `MoveWindowToDesktop` cross-process: NO.**

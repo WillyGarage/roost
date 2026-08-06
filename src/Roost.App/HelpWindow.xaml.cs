@@ -11,7 +11,7 @@ using Clipboard = System.Windows.Clipboard;
 using Brush = System.Windows.Media.Brush;
 using FontFamily = System.Windows.Media.FontFamily;
 
-namespace Vdx.App;
+namespace Roost.App;
 
 /// <summary>
 /// In-app documentation, opened from the tray menu.
@@ -132,7 +132,7 @@ public partial class HelpWindow : Window
         Row("Logs", Log.Directory);
         Row("State", System.IO.Path.Combine(Config.Directory, "state.json"));
         Row("Program", Environment.ProcessPath ?? "(unknown)");
-        Row("Autostart", "Scheduled task \"Vdx\", at logon, highest privileges");
+        Row("Autostart", "Scheduled task \"Roost\", at logon, highest privileges");
 
         Note("State holds your recent destinations and a backup of every desktop name it has " +
              "seen. Logs are one file per day, pruned after 14 days, and every failed " +
@@ -143,7 +143,7 @@ public partial class HelpWindow : Window
 
         if (!_desktops.CanMoveWindows)
             Note("MOVING WINDOWS IS CURRENTLY DISABLED. " + (_desktops.Unavailable ?? "") +
-                 "\nThis usually means a Windows update changed the interfaces Vdx relies on.");
+                 "\nThis usually means a Windows update changed the interfaces Roost relies on.");
 
         Setting("A hotkey does nothing",
             "",
@@ -152,31 +152,31 @@ public partial class HelpWindow : Window
 
         Setting("Windows will not move",
             "",
-            "Windows exposes no supported API for this, so Vdx uses internal interfaces\n" +
+            "Windows exposes no supported API for this, so Roost uses internal interfaces\n" +
             "whose identifiers change between Windows builds. A major update can break\n" +
-            "them. Vdx checks at startup and disables moving rather than failing silently.\n" +
-            "Diagnose with:  dotnet run --project spike\\Vdx.Spike -- --internal");
+            "them. Roost checks at startup and disables moving rather than failing silently.\n" +
+            "Diagnose with:  dotnet run --project spike\\Roost.Spike -- --internal");
 
         Setting("One window refuses to move",
             "",
             "Windows refuses to move a window that is pinned to all desktops, and shell\n" +
             "windows like the desktop and taskbar are ignored on purpose. If the window\n" +
-            "belongs to a program running as administrator, Vdx may need to be elevated\n" +
+            "belongs to a program running as administrator, Roost may need to be elevated\n" +
             "too; the autostart task already runs it elevated.");
 
         Setting("Desktop names disappeared",
             "",
             "An Explorer crash or a big Windows update can wipe the names Windows keeps.\n" +
-            "Vdx backs them up, so they can be put back:\n" +
-            "  dotnet run --project spike\\Vdx.Spike -- --restore-names          (preview)\n" +
-            "  dotnet run --project spike\\Vdx.Spike -- --restore-names --apply  (write)");
+            "Roost backs them up, so they can be put back:\n" +
+            "  dotnet run --project spike\\Roost.Spike -- --restore-names          (preview)\n" +
+            "  dotnet run --project spike\\Roost.Spike -- --restore-names --apply  (write)");
 
         Setting("Other useful commands",
             "",
             "  --current            which desktop am I on\n" +
             "  --switch <name>      switch desktops without the app\n" +
             "  --internal           full capability report for this Windows build\n" +
-            "All via:  dotnet run --project spike\\Vdx.Spike -- <command>");
+            "All via:  dotnet run --project spike\\Roost.Spike -- <command>");
     }
 
     // -----------------------------------------------------------------------
@@ -282,7 +282,7 @@ public partial class HelpWindow : Window
     {
         var sb = new StringBuilder();
 
-        sb.AppendLine($"Vdx {typeof(HelpWindow).Assembly.GetName().Version}");
+        sb.AppendLine($"Roost {typeof(HelpWindow).Assembly.GetName().Version}");
         sb.AppendLine($"Windows {Environment.OSVersion.Version}");
         sb.AppendLine($"elevated: {Log.IsElevated()}");
         sb.AppendLine($"desktops: {_desktops.List().Count}");

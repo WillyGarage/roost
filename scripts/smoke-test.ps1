@@ -25,8 +25,8 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $root = Split-Path -Parent $PSScriptRoot
-$exe  = Join-Path $root 'dist\Vdx.exe'
-$log  = Join-Path $env:LOCALAPPDATA "Vdx\logs\vdx-$(Get-Date -Format yyyyMMdd).log"
+$exe  = Join-Path $root 'dist\Roost.exe'
+$log  = Join-Path $env:LOCALAPPDATA "Roost\logs\roost-$(Get-Date -Format yyyyMMdd).log"
 
 if (-not (Test-Path $exe)) { throw "$exe not found. Run scripts\publish.ps1 first." }
 
@@ -70,7 +70,7 @@ function Send-Text([string]$text) {
     }
 }
 
-Get-Process -Name 'Vdx' -ErrorAction SilentlyContinue | ForEach-Object {
+Get-Process -Name 'Roost' -ErrorAction SilentlyContinue | ForEach-Object {
     Write-Host "stopping existing instance (pid $($_.Id))"
     $_.Kill(); $_.WaitForExit(3000) | Out-Null
 }
@@ -82,7 +82,7 @@ Write-Host "starting $exe"
 $proc = Start-Process -FilePath $exe -PassThru
 Start-Sleep -Seconds 4
 
-if ($proc.HasExited) { throw "Vdx exited immediately with code $($proc.ExitCode)" }
+if ($proc.HasExited) { throw "Roost exited immediately with code $($proc.ExitCode)" }
 Write-Host "running as pid $($proc.Id)"
 
 # The capture step needs a real foreground window to act on. charmap is a convenient
@@ -93,12 +93,12 @@ Start-Sleep -Seconds 2
 
 # Read the chords from config rather than hardcoding them, so changing a default does
 # not silently turn this test into a no-op.
-$cfg       = Get-VdxConfig
+$cfg       = Get-RoostConfig
 $moveKey   = Get-ChordKey $cfg.MoveWindowHotkey
 $switchKey = Get-ChordKey $cfg.SwitchDesktopHotkey
 
-if (-not $ReturnTo) { $ReturnTo = Get-VdxCurrentDesktopName $root }
-if (-not $MoveTo)   { $MoveTo   = Get-VdxOtherDesktopName $ReturnTo }
+if (-not $ReturnTo) { $ReturnTo = Get-RoostCurrentDesktopName $root }
+if (-not $MoveTo)   { $MoveTo   = Get-RoostOtherDesktopName $ReturnTo }
 Write-Host "move to / back to: '$MoveTo' / '$ReturnTo'"
 
 Write-Host "$($cfg.MoveWindowHotkey)  move palette, then Escape"
@@ -157,7 +157,7 @@ if ($TestCreate) {
     Write-Host ""
     Write-Host "-- create phase --"
 
-    $before = Get-VdxDesktopCount
+    $before = Get-RoostDesktopCount
     Write-Host "desktops before: $before"
 
     if (-not $scratch.HasExited) {
@@ -169,7 +169,7 @@ if ($TestCreate) {
         Start-Sleep -Milliseconds 600
     }
 
-    $name = 'Vdx Smoke Test'
+    $name = 'Roost Smoke Test'
     Write-Host "creating desktop '$name' and moving the scratch window onto it"
 
     Send-WinCtrl $moveKey
@@ -179,13 +179,13 @@ if ($TestCreate) {
     Send-AltKey $RET
     Start-Sleep -Seconds 3
 
-    $after = Get-VdxDesktopCount
+    $after = Get-RoostDesktopCount
     Write-Host "desktops after: $after"
 
     # Names come straight from the registry in display order, so printing the whole
     # order shows both that the name landed and that it was positioned correctly:
     # the new desktop should appear immediately after the one we started on.
-    Write-Host "order now: $((Get-VdxDesktopNames) -join ' | ')"
+    Write-Host "order now: $((Get-RoostDesktopNames) -join ' | ')"
 
     # Clean up: we followed the window onto the new desktop, so Win+Ctrl+F4 closes that
     # one. Close the scratch window first, otherwise it gets relocated instead of closed.
@@ -195,7 +195,7 @@ if ($TestCreate) {
     Send-WinCtrl 0x73
     Start-Sleep -Seconds 2
 
-    $final = Get-VdxDesktopCount
+    $final = Get-RoostDesktopCount
     Write-Host "desktops after cleanup: $final  (expected $before)"
 
     if ($final -ne $before) {
@@ -210,4 +210,4 @@ Write-Host "=== log: $log ==="
 if (Test-Path $log) { Get-Content $log } else { Write-Host "NO LOG FILE WAS WRITTEN" }
 
 Write-Host ""
-Write-Host "Vdx is still running as pid $($proc.Id). Stop it with:  Stop-Process -Id $($proc.Id)"
+Write-Host "Roost is still running as pid $($proc.Id). Stop it with:  Stop-Process -Id $($proc.Id)"

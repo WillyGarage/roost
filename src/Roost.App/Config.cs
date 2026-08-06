@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace Vdx.App;
+namespace Roost.App;
 
 /// <summary>
 /// User settings, stored as JSON next to the state file so both are easy to inspect
@@ -70,7 +70,7 @@ public sealed class Config
     // ---- persistence -------------------------------------------------------
 
     public static string Directory { get; } = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Vdx");
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Roost");
 
     public static string FilePath { get; } = Path.Combine(Directory, "config.json");
 
@@ -187,11 +187,11 @@ public sealed class Config
 
         var sb = new StringBuilder();
 
-        sb.AppendLine("// Vdx configuration");
+        sb.AppendLine("// Roost configuration");
         sb.AppendLine("//");
         sb.AppendLine("// Edit, save, then use \"Reload config\" in the tray menu. No restart needed.");
         sb.AppendLine("// Delete this file to get the documented defaults back.");
-        sb.AppendLine("// Comments are preserved by Vdx but will be lost if another tool rewrites it.");
+        sb.AppendLine("// Comments are preserved by Roost but will be lost if another tool rewrites it.");
         sb.AppendLine("//");
         sb.AppendLine("// The tray menu's \"Help\" entry shows this same reference plus the hotkeys,");
         sb.AppendLine("// palette keys, file locations, and troubleshooting steps.");

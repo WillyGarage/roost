@@ -28,9 +28,9 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $root   = Split-Path -Parent $PSScriptRoot
-$exe    = Join-Path $root 'dist\Vdx.exe'
+$exe    = Join-Path $root 'dist\Roost.exe'
 $dotnet = Join-Path $env:LOCALAPPDATA 'Microsoft\dotnet\dotnet.exe'
-$spike  = Join-Path $root 'spike\Vdx.Spike'
+$spike  = Join-Path $root 'spike\Roost.Spike'
 
 function Get-Current { (& $dotnet run --project $spike --no-build -- --current 2>&1) -join ' ' }
 function Set-Current([string]$name) { & $dotnet run --project $spike --no-build -- --switch $name | Out-Null }
@@ -166,21 +166,21 @@ function Test-Switch([string]$kind, [byte]$chordKey) {
     }
 }
 
-Get-Process -Name 'Vdx' -ErrorAction SilentlyContinue | ForEach-Object {
+Get-Process -Name 'Roost' -ErrorAction SilentlyContinue | ForEach-Object {
     $_.Kill(); $_.WaitForExit(3000) | Out-Null
 }
 
-Write-Host "starting Vdx"
-$vdx = Start-Process -FilePath $exe -PassThru
+Write-Host "starting Roost"
+$roost = Start-Process -FilePath $exe -PassThru
 Start-Sleep -Seconds 4
 
-$cfg   = Get-VdxConfig
+$cfg   = Get-RoostConfig
 $chord = $cfg.SwitchDesktopHotkey
 $key   = Get-ChordKey $chord
 Write-Host "switch chord   : $chord"
 
-if (-not $HomeDesktop) { $HomeDesktop = Get-VdxCurrentDesktopName $root }
-if (-not $Target)      { $Target      = Get-VdxOtherDesktopName $HomeDesktop }
+if (-not $HomeDesktop) { $HomeDesktop = Get-RoostCurrentDesktopName $root }
+if (-not $Target)      { $Target      = Get-RoostOtherDesktopName $HomeDesktop }
 Write-Host "home / target  : '$HomeDesktop' / '$Target'"
 
 $kinds = if ($Scratch -eq 'both') { @('charmap', 'settings') } else { @($Scratch) }
@@ -194,6 +194,6 @@ Write-Host "restored to    : $(Get-Current)"
 
 Write-Host ""
 Write-Host "=== recent log ==="
-Get-Content (Join-Path $env:LOCALAPPDATA "Vdx\logs\vdx-$(Get-Date -Format yyyyMMdd).log") -Tail 14
+Get-Content (Join-Path $env:LOCALAPPDATA "Roost\logs\roost-$(Get-Date -Format yyyyMMdd).log") -Tail 14
 
-Stop-Process -Id $vdx.Id -ErrorAction SilentlyContinue
+Stop-Process -Id $roost.Id -ErrorAction SilentlyContinue

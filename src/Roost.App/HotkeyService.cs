@@ -1,7 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Windows.Interop;
 
-namespace Vdx.App;
+namespace Roost.App;
 
 /// <summary>What a registered hotkey should do.</summary>
 public enum HotkeyAction
@@ -48,7 +48,7 @@ public sealed class HotkeyService : IDisposable
     public HotkeyService()
     {
         // A message-only window: never shown, exists purely to receive WM_HOTKEY.
-        _source = new HwndSource(new HwndSourceParameters("Vdx.HotkeySink")
+        _source = new HwndSource(new HwndSourceParameters("Roost.HotkeySink")
         {
             Width = 0,
             Height = 0,

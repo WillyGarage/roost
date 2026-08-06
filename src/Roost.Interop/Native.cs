@@ -1,7 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace Vdx.Interop;
+namespace Roost.Interop;
 
 /// <summary>
 /// Raw Win32 P/Invoke. Nothing virtual-desktop specific lives here.

@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace Vdx.Interop;
+namespace Roost.Interop;
 
 // ---------------------------------------------------------------------------
 // Undocumented shell interfaces.

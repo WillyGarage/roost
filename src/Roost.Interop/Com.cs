@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace Vdx.Interop;
+namespace Roost.Interop;
 
 // ---------------------------------------------------------------------------
 // Documented, stable API. Shipped in shell32 and covered by MSDN. Safe to call.

@@ -1,7 +1,7 @@
 using System.IO;
 using System.Text;
 
-namespace Vdx.App;
+namespace Roost.App;
 
 /// <summary>
 /// Append-only file log with a daily file.
@@ -17,10 +17,10 @@ public static class Log
 
     public static string Directory { get; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "Vdx", "logs");
+        "Roost", "logs");
 
     public static string CurrentFile => _path ??= Path.Combine(
-        Directory, $"vdx-{DateTime.Now:yyyyMMdd}.log");
+        Directory, $"roost-{DateTime.Now:yyyyMMdd}.log");
 
     public static void Init()
     {
@@ -64,7 +64,7 @@ public static class Log
         {
             var cutoff = DateTime.Now.AddDays(-14);
 
-            foreach (var file in System.IO.Directory.EnumerateFiles(Directory, "vdx-*.log"))
+            foreach (var file in System.IO.Directory.EnumerateFiles(Directory, "roost-*.log"))
                 if (File.GetLastWriteTime(file) < cutoff)
                     File.Delete(file);
         }

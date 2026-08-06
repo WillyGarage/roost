@@ -5,13 +5,13 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Vdx.Interop", "src\Vdx.Interop\Vdx.Interop.csproj", "{FF3475C9-71D4-49E5-A119-69C90D0A4619}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Roost.Interop", "src\Roost.Interop\Roost.Interop.csproj", "{FF3475C9-71D4-49E5-A119-69C90D0A4619}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "spike", "spike", "{D6EA9C13-5DDC-B6DF-E3F6-EC65D4C25D12}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Vdx.Spike", "spike\Vdx.Spike\Vdx.Spike.csproj", "{2E3BCC6E-B30F-4DAE-9829-2ABFC27C3C6E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Roost.Spike", "spike\Roost.Spike\Roost.Spike.csproj", "{2E3BCC6E-B30F-4DAE-9829-2ABFC27C3C6E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Vdx.App", "src\Vdx.App\Vdx.App.csproj", "{617BF8B0-2846-41B0-8D8F-4D66CC12BA49}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Roost.App", "src\Roost.App\Roost.App.csproj", "{617BF8B0-2846-41B0-8D8F-4D66CC12BA49}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

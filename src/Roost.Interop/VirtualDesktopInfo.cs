@@ -1,4 +1,4 @@
-namespace Vdx.Interop;
+namespace Roost.Interop;
 
 /// <summary>
 /// One virtual desktop, as enumerated from the registry.

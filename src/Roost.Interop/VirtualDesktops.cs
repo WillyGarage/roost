@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace Vdx.Interop;
+namespace Roost.Interop;
 
 /// <summary>
 /// Outcome of an operation, carrying the HRESULT so failures are diagnosable from

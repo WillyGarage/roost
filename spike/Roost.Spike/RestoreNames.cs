@@ -1,7 +1,7 @@
 using System.Text.Json;
-using Vdx.Interop;
+using Roost.Interop;
 
-namespace Vdx.Spike;
+namespace Roost.Spike;
 
 /// <summary>
 /// Restores desktop names from the app's own backup.
@@ -27,7 +27,7 @@ internal static class RestoreNames
                        .FirstOrDefault(a => !a.StartsWith("--"))
                    ?? Path.Combine(
                        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                       "Vdx", "state.json");
+                       "Roost", "state.json");
 
         Console.WriteLine($"backup file : {path}");
 

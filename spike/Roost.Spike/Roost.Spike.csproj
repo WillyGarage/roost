@@ -5,7 +5,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Vdx.Interop\Vdx.Interop.csproj" />
+    <ProjectReference Include="..\..\src\Roost.Interop\Roost.Interop.csproj" />
   </ItemGroup>
 
 </Project>

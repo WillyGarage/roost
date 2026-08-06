@@ -1,7 +1,7 @@
 using System.IO;
 using System.Text.Json;
 
-namespace Vdx.App;
+namespace Roost.App;
 
 /// <summary>
 /// Small persisted state: recently used destinations, the last desktop we created, and
@@ -73,7 +73,7 @@ public sealed class AppState
     }
 
     /// <summary>Refreshes the name backup from whatever the registry currently reports.</summary>
-    public void SnapshotNames(IEnumerable<Vdx.Interop.VirtualDesktopInfo> desktops)
+    public void SnapshotNames(IEnumerable<Roost.Interop.VirtualDesktopInfo> desktops)
     {
         var changed = false;
 

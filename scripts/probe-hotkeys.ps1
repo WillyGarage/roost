@@ -5,7 +5,7 @@
 # PowerToys and vendor utilities claim more. RegisterHotKey returning error 1409 is the
 # only authoritative answer.
 #
-# Stop Vdx before running this, or the chords it already holds will report as taken.
+# Stop Roost before running this, or the chords it already holds will report as taken.
 #
 # Pass -Chords to test a specific set, e.g.
 #   .\probe-hotkeys.ps1 -Chords 'Win+Ctrl+H','Win+Ctrl+T'

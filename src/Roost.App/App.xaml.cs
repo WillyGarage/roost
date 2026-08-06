@@ -1,12 +1,12 @@
 using System.Windows;
-using Vdx.Interop;
+using Roost.Interop;
 
 // This project enables both WPF and WinForms (the latter only for the tray icon and
 // Screen), so several type names exist in both. Alias the WPF ones explicitly rather
 // than fully qualifying every use site.
 using Application = System.Windows.Application;
 
-namespace Vdx.App;
+namespace Roost.App;
 
 /// <summary>
 /// Tray-resident host. Owns the services, wires the hotkeys to the palette, and is the
@@ -38,7 +38,7 @@ public partial class App : Application
         // at all: the logon task appeared to start and stop for no reason.
         Log.Init();
 
-        _singleInstance = new Mutex(initiallyOwned: true, "Vdx.SingleInstance", out var isFirst);
+        _singleInstance = new Mutex(initiallyOwned: true, "Roost.SingleInstance", out var isFirst);
 
         if (!isFirst)
         {
@@ -75,7 +75,7 @@ public partial class App : Application
 
         if (!_desktops.CanMoveWindows)
             _tray.ShowError(
-                $"Vdx cannot move windows on this Windows build. {_desktops.Unavailable} " +
+                $"Roost cannot move windows on this Windows build. {_desktops.Unavailable} " +
                 $"Listing and switching may still work. See the log for details.");
 
         RegisterHotkeys();
@@ -182,7 +182,7 @@ public partial class App : Application
         Native.GetWindowThreadProcessId(hWnd, out var owner);
         if (owner == (uint)Environment.ProcessId)
         {
-            reason = "one of Vdx's own windows";
+            reason = "one of Roost's own windows";
             return false;
         }
 

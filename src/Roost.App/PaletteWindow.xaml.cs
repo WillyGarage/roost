@@ -1,13 +1,13 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using Vdx.Interop;
+using Roost.Interop;
 
 // WinForms is enabled in this project for the tray icon, so disambiguate the WPF types
 // whose names it also defines.
 using KeyEventArgs = System.Windows.Input.KeyEventArgs;
 
-namespace Vdx.App;
+namespace Roost.App;
 
 /// <summary>
 /// The single window the whole app is driven from. One hotkey opens it, and every desktop

@@ -8,8 +8,8 @@
          reports monitor working areas in physical pixels. -->
     <UseWindowsForms>true</UseWindowsForms>
 
-    <AssemblyName>Vdx</AssemblyName>
-    <RootNamespace>Vdx.App</RootNamespace>
+    <AssemblyName>Roost</AssemblyName>
+    <RootNamespace>Roost.App</RootNamespace>
 
     <!-- Runs as the invoking user. Elevation comes from the scheduled task created by
          scripts\install-autostart.ps1, so a manual launch does not throw a UAC prompt.
@@ -34,7 +34,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Vdx.Interop\Vdx.Interop.csproj" />
+    <ProjectReference Include="..\Roost.Interop\Roost.Interop.csproj" />
   </ItemGroup>
 
 </Project>

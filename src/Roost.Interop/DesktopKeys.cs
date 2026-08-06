@@ -1,4 +1,4 @@
-namespace Vdx.Interop;
+namespace Roost.Interop;
 
 /// <summary>
 /// Desktop create / close / switch driven by the shell's own global hotkeys.

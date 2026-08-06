@@ -1,4 +1,4 @@
-# Registers Vdx to start at logon, elevated.
+# Registers Roost to start at logon, elevated.
 #
 # MUST BE RUN AS ADMINISTRATOR (registering a highest-privileges task requires it).
 #
@@ -9,9 +9,9 @@
 
 $ErrorActionPreference = 'Stop'
 
-$taskName = 'Vdx'
+$taskName = 'Roost'
 $root     = Split-Path -Parent $PSScriptRoot
-$exe      = Join-Path $root 'dist\Vdx.exe'
+$exe      = Join-Path $root 'dist\Roost.exe'
 
 $isAdmin = ([Security.Principal.WindowsPrincipal] `
     [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -68,5 +68,5 @@ Start-Sleep -Seconds 2
 $state = (Get-ScheduledTask -TaskName $taskName).State
 Write-Host "Task state: $state"
 Write-Host ""
-Write-Host "Look for the Vdx icon in the notification area. Right-click it for the"
+Write-Host "Look for the Roost icon in the notification area. Right-click it for the"
 Write-Host "hotkey list, the config file, and the logs."

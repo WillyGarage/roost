@@ -1,6 +1,6 @@
-using Vdx.Interop;
+using Roost.Interop;
 
-namespace Vdx.App;
+namespace Roost.App;
 
 /// <summary>
 /// The app's single entry point for desktop operations. Combines the three tiers:

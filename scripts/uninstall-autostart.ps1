@@ -3,7 +3,7 @@
 
 $ErrorActionPreference = 'Stop'
 
-$taskName = 'Vdx'
+$taskName = 'Roost'
 
 $isAdmin = ([Security.Principal.WindowsPrincipal] `
     [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -20,11 +20,11 @@ if (Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue) {
     Write-Host "No scheduled task '$taskName' found."
 }
 
-Get-Process -Name 'Vdx' -ErrorAction SilentlyContinue | ForEach-Object {
-    Write-Host "Stopping Vdx (pid $($_.Id))..."
+Get-Process -Name 'Roost' -ErrorAction SilentlyContinue | ForEach-Object {
+    Write-Host "Stopping Roost (pid $($_.Id))..."
     $_.Kill()
 }
 
 Write-Host "Done. Config and logs are left in place:"
-Write-Host "  $env:APPDATA\Vdx"
-Write-Host "  $env:LOCALAPPDATA\Vdx\logs"
+Write-Host "  $env:APPDATA\Roost"
+Write-Host "  $env:LOCALAPPDATA\Roost\logs"

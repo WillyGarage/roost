@@ -1,9 +1,7 @@
-# bill_virtual_desktops
+# Roost
 
 A resident Windows 11 tray utility that moves the active window to another virtual
 desktop from a type-to-search palette, and creates + names new desktops on the fly.
-
-`Vdx` is a placeholder assembly prefix; renaming it later is a find/replace.
 
 ## Requirements
 
@@ -37,10 +35,10 @@ of that with: hotkey, type part of a desktop name, Enter.
 ## Layout
 
 ```
-src/Vdx.Interop/    Virtual-desktop access layer. Registry reads + COM interop,
+src/Roost.Interop/  Virtual-desktop access layer. Registry reads + COM interop,
                     stratified by stability (see docs/NOTES.md). No UI.
-src/Vdx.App/        WPF tray app: hotkey/mouse hooks, palette window, config, logging.
-spike/Vdx.Spike/    Console harness for probing COM interfaces and verifying which
+src/Roost.App/      WPF tray app: hotkey/mouse hooks, palette window, config, logging.
+spike/Roost.Spike/  Console harness for probing COM interfaces and verifying which
                     operations actually work on a given Windows build. Kept in the
                     repo permanently: it is the diagnostic to run after a Windows
                     update breaks something.
@@ -54,9 +52,9 @@ Requires the .NET 9 SDK on **Windows** (not WSL). WPF cannot be built on Linux, 
 the shipped .exe must live on the Windows filesystem because it autostarts at logon.
 
 ```powershell
-cd C:\dev\bill_virtual_desktops
+cd C:\dev\roost
 dotnet build
-dotnet run --project spike\Vdx.Spike        # capability report for this machine
+dotnet run --project spike\Roost.Spike      # capability report for this machine
 ```
 
 Release, single self-contained .exe:
@@ -87,7 +85,7 @@ MIT. See [LICENSE](LICENSE).
 ## Install
 
 ```powershell
-.\scripts\publish.ps1     # builds dist\Vdx.exe (single file, ~71 MB)
+.\scripts\publish.ps1     # builds dist\Roost.exe (single file, ~71 MB)
 ```
 
 Then set up autostart. Easiest is the `.cmd` wrapper, which self-elevates and bypasses
@@ -158,7 +156,7 @@ An empty search box lists recently used destinations first.
 
 Right-click the tray icon for the hotkey list, the config file, and the log folder.
 
-Defaults live in `%APPDATA%\Vdx\config.json` and are re-read by "Reload config" in the
+Defaults live in `%APPDATA%\Roost\config.json` and are re-read by "Reload config" in the
 tray menu. `Win+Ctrl+M` from the original brief is **not** used because Windows reserves
 it for Magnifier settings; run `scripts\probe-hotkeys.ps1` before choosing replacements.
 
@@ -169,23 +167,23 @@ turned out to be quick enough. Set `SendToLastCreatedHotkey` in the config to en
 ## Operations
 
 **Rebuilding after a code change.** `scripts\publish.ps1` stops any running instance
-first (a live process holds `dist\Vdx.exe` open and the publish would fail partway), and
+first (a live process holds `dist\Roost.exe` open and the publish would fail partway), and
 restarts the logon task afterwards if one is registered. So a rebuild is just:
 
 ```powershell
 .\scripts\publish.ps1
 ```
 
-Note the logon task points at `C:\dev\bill_virtual_desktops\dist\Vdx.exe`. Moving or
+Note the logon task points at `C:\dev\roost\dist\Roost.exe`. Moving or
 deleting the repo breaks autostart; re-run `install-autostart.ps1` after relocating it.
 
 **If Windows loses your desktop names.** An Explorer crash or a major Windows update can
 wipe the names in HKCU, leaving a row of "Desktop 7". The app snapshots GUID-to-name into
-`%APPDATA%\Vdx\state.json` on every create and every palette open, so:
+`%APPDATA%\Roost\state.json` on every create and every palette open, so:
 
 ```powershell
-dotnet run --project spike\Vdx.Spike -- --restore-names          # shows what it would do
-dotnet run --project spike\Vdx.Spike -- --restore-names --apply  # writes them back
+dotnet run --project spike\Roost.Spike -- --restore-names          # shows what it would do
+dotnet run --project spike\Roost.Spike -- --restore-names --apply  # writes them back
 ```
 
 It only touches desktops that still exist, so deleted ones are never resurrected.
@@ -195,22 +193,22 @@ The app checks at startup and, if the check fails, shows a tray balloon and disa
 moving windows rather than failing silently per action. To diagnose:
 
 ```powershell
-dotnet run --project spike\Vdx.Spike -- --internal
+dotnet run --project spike\Roost.Spike -- --internal
 ```
 
 That reports which interface IDs this build accepts. Add the new one to the candidate
-list in `src\Vdx.Interop\Com.cs` and check the vtable layout in `ComInternal.cs` against
+list in `src\Roost.Interop\Com.cs` and check the vtable layout in `ComInternal.cs` against
 a maintained reference. There is no fallback for moving windows: Windows ships no hotkey
 for it, so that capability is the one thing an update can genuinely take away.
 
 **Other useful spike modes.** All read-only except `--delete`.
 
 ```powershell
-dotnet run --project spike\Vdx.Spike -- --list             # desktops with window counts
-dotnet run --project spike\Vdx.Spike -- --list --windows   # ...and the window titles
-dotnet run --project spike\Vdx.Spike -- --current          # which desktop am I on
-dotnet run --project spike\Vdx.Spike -- --switch Comm      # switch, bypassing the app
-dotnet run --project spike\Vdx.Spike -- --delete "Name"    # remove a stray desktop
+dotnet run --project spike\Roost.Spike -- --list             # desktops with window counts
+dotnet run --project spike\Roost.Spike -- --list --windows   # ...and the window titles
+dotnet run --project spike\Roost.Spike -- --current          # which desktop am I on
+dotnet run --project spike\Roost.Spike -- --switch Comm      # switch, bypassing the app
+dotnet run --project spike\Roost.Spike -- --delete "Name"    # remove a stray desktop
 ```
 
 `--list` is the one to reach for if the window counts in the palette ever look wrong; it
@@ -226,7 +224,7 @@ against the registry, then puts the machine back as it found it.
 .\scripts\probe-hotkeys.ps1                    # which chords are free on this machine
 ```
 
-**Logs** are in `%LOCALAPPDATA%\Vdx\logs`, one file per day, pruned after 14 days.
+**Logs** are in `%LOCALAPPDATA%\Roost\logs`, one file per day, pruned after 14 days.
 Every failed operation records its HRESULT there.
 
 ## Status

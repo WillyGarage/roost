@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace Vdx.Interop;
+namespace Roost.Interop;
 
 /// <summary>
 /// Virtual desktop operations that require the undocumented shell interfaces.
