@@ -134,6 +134,11 @@ public partial class PaletteWindow : Window
         _windowCounts = _windowsByDesktop.ToDictionary(kv => kv.Key, kv => kv.Value.Count);
 
         _currentDesktop = _desktops.GetCurrentDesktopId(_captured);
+
+        CurrentDesktopText.Text = desktops.FirstOrDefault(d => d.Id == _currentDesktop) is { } current
+            ? $"You're on “{current.DisplayName}”."
+            : "";
+
         _capturedWindowDesktop = _mode == Mode.MoveWindow && _captured != IntPtr.Zero
             ? _desktops.GetWindowDesktopId(_captured)
             : null;
