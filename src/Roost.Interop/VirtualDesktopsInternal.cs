@@ -35,7 +35,15 @@ public sealed class VirtualDesktopsInternal : IDisposable
             return;
         }
 
-        _shell = Activator.CreateInstance(shellType);
+        try
+        {
+            _shell = Activator.CreateInstance(shellType);
+        }
+        catch (COMException ex)
+        {
+            UnavailableReason = $"ImmersiveShell activation failed (0x{ex.HResult:X8}); Explorer may still be loading";
+            return;
+        }
         if (_shell is not IServiceProvider10 provider)
         {
             UnavailableReason = "ImmersiveShell does not expose IServiceProvider";

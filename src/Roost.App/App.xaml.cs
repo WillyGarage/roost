@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Threading;
 using Roost.Interop;
 
 // This project enables both WPF and WinForms (the latter only for the tray icon and
@@ -74,9 +75,10 @@ public partial class App : Application
         _tray.HelpRequested += ShowHelp;
 
         if (!_desktops.CanMoveWindows)
-            _tray.ShowError(
-                $"Roost cannot move windows on this Windows build. {_desktops.Unavailable} " +
-                $"Listing and switching may still work. See the log for details.");
+        {
+            Log.Warn($"desktop interfaces unavailable at startup: {_desktops.Unavailable}; will retry");
+            ScheduleRetry();
+        }
 
         RegisterHotkeys();
 
@@ -255,6 +257,42 @@ public partial class App : Application
             _state.RecordDestination(target.Value, _config.RecentDestinationCount);
         else
             _tray!.ShowError(error ?? "Could not move the window.");
+    }
+
+    // -----------------------------------------------------------------------
+    // startup retry
+    // -----------------------------------------------------------------------
+
+    private void ScheduleRetry(int attempt = 0)
+    {
+        const int maxAttempts = 10;
+
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            _desktops?.Dispose();
+            _desktops = new DesktopService();
+
+            if (_desktops.CanMoveWindows)
+            {
+                Log.Info($"desktop interfaces available after {attempt + 1} retries");
+                _tray?.SetStatus($"{_desktops.List().Count} desktops");
+            }
+            else if (attempt + 1 < maxAttempts)
+            {
+                Log.Warn($"retry {attempt + 1}/{maxAttempts}: still unavailable: {_desktops.Unavailable}");
+                ScheduleRetry(attempt + 1);
+            }
+            else
+            {
+                Log.Error($"desktop interfaces still unavailable after {maxAttempts} retries: {_desktops.Unavailable}");
+                _tray?.ShowError(
+                    $"Roost cannot move windows on this Windows build. {_desktops.Unavailable} " +
+                    "Listing and switching may still work. See the log for details.");
+            }
+        };
+        timer.Start();
     }
 
     // -----------------------------------------------------------------------
